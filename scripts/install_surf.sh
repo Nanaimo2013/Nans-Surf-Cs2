@@ -81,10 +81,10 @@ download_plugin_sources() {
     # Define plugin sources
     declare -A PLUGIN_SOURCES=(
         # SourceMod Core Plugins
-        ["adminmenu"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/adminmenu.sp"
-        ["basecommands"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/basecommands.sp"
-        ["mapchooser"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/mapchooser.sp"
-        ["rockthevote"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/rockthevote.sp"
+        ["adminmenu"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/adminmenu.sp"
+        ["basecommands"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/basecommands.sp"
+        ["mapchooser"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/mapchooser.sp"
+        ["rockthevote"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/rockthevote.sp"
         
         # Custom Nans Surf Plugin
         ["nans_surf"]="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/plugins/nans_surf.sp"
