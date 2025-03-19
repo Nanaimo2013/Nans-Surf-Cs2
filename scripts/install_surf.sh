@@ -22,6 +22,9 @@ download_file() {
     local retry_count=0
     local silent="${3:-false}"
 
+    # Ensure target directory exists
+    mkdir -p "$(dirname "$target")"
+
     while [ $retry_count -lt $max_retries ]; do
         if [ "$silent" = "true" ]; then
             if curl -sSL --fail --max-time 60 "$url" -o "$target" 2>/dev/null; then
@@ -53,6 +56,9 @@ CONFIGS_DIR="$BASE_DIR/configs"
 PLUGINS_DIR="$BASE_DIR/plugins"
 SCRIPTING_DIR="$SOURCEMOD_DIR/scripting"
 INCLUDE_DIR="$SOURCEMOD_DIR/scripting/include"
+
+# GitHub repository base URL
+REPO_BASE_URL="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main"
 
 # Create required directories
 create_directories() {
@@ -105,25 +111,68 @@ download_include_files() {
     done
 }
 
-# Copy local plugins and configurations
-copy_local_files() {
-    log_message "Copying local plugins and configurations..."
+# Download configuration files from GitHub
+download_config_files() {
+    log_message "Downloading configuration files..."
 
-    # Copy local plugins
-    if [ -d "$BASE_DIR/plugins" ]; then
-        cp "$BASE_DIR/plugins/"*.sp "$SCRIPTING_DIR/" 2>/dev/null || true
-    fi
+    # Configuration files to download
+    local config_files=(
+        "configs/surf/server.cfg"
+        "configs/surf/workshop_maps.cfg"
+        "configs/surf/maplist.txt"
+        "configs/surf/maptiers.cfg"
+        "configs/surf/admin_commands.cfg"
+        "configs/surf/hud.cfg"
+        "configs/surf/quickmenu.cfg"
+        "configs/surf/storage.cfg"
+        "configs/surf/surf_advertisements.cfg"
+    )
 
-    # Copy local configurations
-    if [ -d "$BASE_DIR/configs/surf" ]; then
-        cp "$BASE_DIR/configs/surf/"* "$SOURCEMOD_DIR/configs/surf/" 2>/dev/null || true
-    fi
+    for config in "${config_files[@]}"; do
+        local target_path="$SOURCEMOD_DIR/${config}"
+        download_file "${REPO_BASE_URL}/${config}" "$target_path"
+    done
 
-    # Copy local maps
-    if [ -d "$BASE_DIR/maps" ]; then
-        cp "$BASE_DIR/maps/"*.bsp "$CSGO_DIR/maps/" 2>/dev/null || true
-        cp "$BASE_DIR/maps/workshop/"*.bsp "$CSGO_DIR/maps/workshop/" 2>/dev/null || true
-    fi
+    # Create autoexec.cfg
+    mkdir -p "$CSGO_DIR/cfg"
+    cat > "$CSGO_DIR/cfg/autoexec.cfg" << EOL
+// Auto-execute configuration
+exec server.cfg
+exec workshop_maps.cfg
+EOL
+}
+
+# Download plugins from GitHub
+download_plugins() {
+    log_message "Downloading plugins..."
+
+    # Plugins to download
+    local plugins=(
+        "plugins/nans_surf.sp"
+    )
+
+    for plugin in "${plugins[@]}"; do
+        local target_path="$SCRIPTING_DIR/$(basename "$plugin")"
+        download_file "${REPO_BASE_URL}/${plugin}" "$target_path"
+    done
+}
+
+# Download maps from GitHub
+download_maps() {
+    log_message "Downloading maps..."
+
+    # Map download URLs (you may need to adjust these)
+    declare -A MAP_SOURCES=(
+        ["surf_beginner.bsp"]="${REPO_BASE_URL}/maps/surf_beginner.bsp"
+        ["surf_easy_v2.bsp"]="${REPO_BASE_URL}/maps/surf_easy_v2.bsp"
+        ["surf_rookie.bsp"]="${REPO_BASE_URL}/maps/surf_rookie.bsp"
+        ["surf_mesa.bsp"]="${REPO_BASE_URL}/maps/surf_mesa.bsp"
+    )
+
+    # Download maps to game maps directory
+    for map_name in "${!MAP_SOURCES[@]}"; do
+        download_file "${MAP_SOURCES[$map_name]}" "$CSGO_DIR/maps/$map_name"
+    done
 }
 
 # Compile local plugins
@@ -154,49 +203,6 @@ compile_local_plugins() {
     cd "$BASE_DIR"
 }
 
-# Create essential configuration files
-create_config_files() {
-    log_message "Creating essential configuration files..."
-
-    # Create server.cfg
-    mkdir -p "$CSGO_DIR/cfg"
-    cat > "$CSGO_DIR/cfg/server.cfg" << EOL
-// Basic Server Configuration
-hostname "Nans Surf CS2 Server"
-sv_lan 0
-sv_allow_lobby_connect_only 0
-sv_cheats 0
-sv_maxrate 0
-sv_minrate 100000
-sv_maxupdaterate 128
-sv_minupdaterate 32
-
-// Surf-specific settings
-mp_autoteambalance 0
-mp_limitteams 0
-mp_falldamage 0
-sv_airaccelerate 150
-sv_gravity 800
-EOL
-
-    # Create workshop_maps.cfg
-    cat > "$CSGO_DIR/cfg/workshop_maps.cfg" << EOL
-// Workshop Map Collection
-// Add your workshop map IDs here
-workshop_download_map 2978658821 // surf_beginner
-workshop_download_map 2978658999 // surf_easy_v2
-workshop_download_map 2978659001 // surf_rookie
-workshop_download_map 2978659002 // surf_mesa
-EOL
-
-    # Create autoexec.cfg
-    cat > "$CSGO_DIR/cfg/autoexec.cfg" << EOL
-// Auto-execute configuration
-exec server.cfg
-exec workshop_maps.cfg
-EOL
-}
-
 # Steam Game Server Account setup
 setup_steam_account() {
     # Check if Steam Account Token is set
@@ -217,9 +223,10 @@ main() {
     create_directories
     setup_sourcemod
     download_include_files
-    copy_local_files
+    download_config_files
+    download_plugins
+    download_maps
     compile_local_plugins
-    create_config_files
     setup_steam_account
     
     # Set correct permissions
