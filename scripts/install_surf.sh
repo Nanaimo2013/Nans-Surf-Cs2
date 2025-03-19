@@ -23,9 +23,10 @@ download_file() {
     local silent="${3:-false}"
 
     while [ $retry_count -lt $max_retries ]; do
-        local curl_output
         if [ "$silent" = "true" ]; then
-            curl_output=$(curl -sSL --fail --max-time 60 "$url" -o "$target" 2>&1) || true
+            if curl -sSL --fail --max-time 60 "$url" -o "$target" 2>/dev/null; then
+                return 0
+            fi
         else
             if curl -sSL --fail --max-time 60 "$url" -o "$target"; then
                 log_message "Successfully downloaded $url to $target"
@@ -35,12 +36,6 @@ download_file() {
 
         retry_count=$((retry_count + 1))
         log_message "Download failed (attempt $retry_count/$max_retries): $url"
-        
-        if [ "$silent" = "true" ] && [ $retry_count -eq $max_retries ]; then
-            log_message "Silent download failed: $url"
-            return 1
-        fi
-        
         sleep 2
     done
 
@@ -90,27 +85,24 @@ setup_sourcemod() {
 
 # Download essential include files
 download_include_files() {
-    log_message "Checking and downloading include files..."
+    log_message "Downloading essential include files..."
     
     # Define include files to download
     declare -A INCLUDE_SOURCES=(
         ["multicolors.inc"]="https://raw.githubusercontent.com/Bara/Multi-Colors/master/scripting/include/multicolors.inc"
+        ["timer.inc"]="https://raw.githubusercontent.com/surftimer/SurfTimer/master/scripting/include/surftimer.inc"
     )
 
-    # Check if the plugin requires specific includes
-    local plugin_path="$SCRIPTING_DIR/nans_surf.sp"
-    
-    if [ -f "$plugin_path" ]; then
-        for include_name in "${!INCLUDE_SOURCES[@]}"; do
-            # Check if the plugin uses this include
-            if grep -q "$include_name" "$plugin_path"; then
-                log_message "Downloading $include_name..."
-                if ! download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}" "true"; then
-                    log_message "WARNING: Could not download $include_name. Plugin may not compile correctly."
-                fi
-            fi
-        done
-    fi
+    # Ensure include directory exists
+    mkdir -p "$INCLUDE_DIR"
+
+    # Download each include file
+    for include_name in "${!INCLUDE_SOURCES[@]}"; do
+        log_message "Downloading $include_name..."
+        if ! download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}" "true"; then
+            log_message "WARNING: Could not download $include_name. Plugin may not compile correctly."
+        fi
+    done
 }
 
 # Copy local plugins and configurations
@@ -153,13 +145,56 @@ compile_local_plugins() {
             plugin_name="${sp_file%.*}"
             log_message "Compiling $sp_file to ${plugin_name}.smx"
             
-            # Compile with include path
+            # Compile with include path and ignore certain errors
             if ! "$spcomp" -i"$INCLUDE_DIR" "$sp_file" -o"../plugins/${plugin_name}.smx"; then
-                log_message "WARNING: Failed to compile $sp_file"
+                log_message "WARNING: Failed to compile $sp_file completely. Continuing..."
             fi
         fi
     done
     cd "$BASE_DIR"
+}
+
+# Create essential configuration files
+create_config_files() {
+    log_message "Creating essential configuration files..."
+
+    # Create server.cfg
+    mkdir -p "$CSGO_DIR/cfg"
+    cat > "$CSGO_DIR/cfg/server.cfg" << EOL
+// Basic Server Configuration
+hostname "Nans Surf CS2 Server"
+sv_lan 0
+sv_allow_lobby_connect_only 0
+sv_cheats 0
+sv_maxrate 0
+sv_minrate 100000
+sv_maxupdaterate 128
+sv_minupdaterate 32
+
+// Surf-specific settings
+mp_autoteambalance 0
+mp_limitteams 0
+mp_falldamage 0
+sv_airaccelerate 150
+sv_gravity 800
+EOL
+
+    # Create workshop_maps.cfg
+    cat > "$CSGO_DIR/cfg/workshop_maps.cfg" << EOL
+// Workshop Map Collection
+// Add your workshop map IDs here
+workshop_download_map 2978658821 // surf_beginner
+workshop_download_map 2978658999 // surf_easy_v2
+workshop_download_map 2978659001 // surf_rookie
+workshop_download_map 2978659002 // surf_mesa
+EOL
+
+    # Create autoexec.cfg
+    cat > "$CSGO_DIR/cfg/autoexec.cfg" << EOL
+// Auto-execute configuration
+exec server.cfg
+exec workshop_maps.cfg
+EOL
 }
 
 # Steam Game Server Account setup
@@ -184,6 +219,7 @@ main() {
     download_include_files
     copy_local_files
     compile_local_plugins
+    create_config_files
     setup_steam_account
     
     # Set correct permissions

@@ -6,7 +6,6 @@
 #include <multicolors>
 #include <mapchooser>
 #include <timer>
-#include <mysql>
 #include <cstrike>
 
 #pragma semicolon 1
