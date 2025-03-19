@@ -78,7 +78,6 @@ COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home
 # Copy optional content (using temporary directories to handle missing folders)
 COPY        --chown=container:container ./gamefiles/materials/ /home/container/tmp/materials/
 COPY        --chown=container:container ./gamefiles/models/ /home/container/tmp/models/
-COPY        --chown=container:container ./gamefiles/sound/ /home/container/tmp/sound/
 COPY        --chown=container:container ./gamefiles/data/ /home/container/tmp/data/
 
 # Move optional content to final location if it exists
