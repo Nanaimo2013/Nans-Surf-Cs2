@@ -213,35 +213,36 @@ Suggested Map Sources:
 EOL
 }
 
-# Compile local plugins
+# Compile local plugins with error handling
 compile_local_plugins() {
     log_message "Compiling local plugins..."
     
-    # Find spcomp compiler
-    local spcomp=$(find "$SOURCEMOD_DIR" -name "spcomp" | head -n 1)
-    
-    if [ -z "$spcomp" ]; then
-        log_message "WARNING: SourcePawn compiler not found. Skipping plugin compilation."
-        return
-    fi
-
     # Ensure plugins directory exists
-    mkdir -p "$SOURCEMOD_DIR/plugins/nans_surftimer"
-
-    # Compile all .sp files in scripting directory
-    cd "$SCRIPTING_DIR"
-    for sp_file in *.sp nans_surftimer/*.sp; do
-        if [ -f "$sp_file" ]; then
-            plugin_name="${sp_file%.*}"
-            log_message "Compiling $sp_file to ${plugin_name}.smx"
-            
-            # Compile with include path and ignore certain errors
-            if ! "$spcomp" -i"$INCLUDE_DIR" "$sp_file" -o"../plugins/${plugin_name}.smx"; then
-                log_message "WARNING: Failed to compile $sp_file completely. Continuing..."
-            fi
+    mkdir -p "$PLUGINS_DIR/nans_surftimer"
+    
+    # Compile each plugin, but don't stop on errors
+    for plugin in "${SCRIPTING_DIR}"/*.sp "${SCRIPTING_DIR}"/nans_surftimer/*.sp; do
+        if [ ! -f "$plugin" ]; then
+            continue
+        fi
+        
+        plugin_name=$(basename "$plugin")
+        output_plugin="${PLUGINS_DIR}/${plugin_name%.sp}.smx"
+        
+        log_message "Compiling $plugin_name"
+        
+        # Compile with include paths and maximum error tolerance
+        compilation_output=$(cd "$SCRIPTING_DIR" && ./spcomp -E -i"$INCLUDE_DIR" "$plugin" -o"$output_plugin" 2>&1)
+        
+        # Check compilation status
+        if [ $? -ne 0 ]; then
+            log_message "WARNING: Compilation failed for $plugin_name"
+            log_message "Compilation Errors:"
+            echo "$compilation_output" | head -n 10  # Show first 10 lines of errors
+        else
+            log_message "Successfully compiled $plugin_name"
         fi
     done
-    cd "$BASE_DIR"
 }
 
 # Steam Game Server Account setup
@@ -257,6 +258,17 @@ setup_steam_account() {
     echo "sv_setsteamaccount ${STEAM_ACCOUNT}" > "$CSGO_DIR/cfg/steam_account.cfg"
 }
 
+# Copy custom include files
+copy_include_files() {
+    log_message "Copying custom include files..."
+    
+    # Ensure include directory exists
+    mkdir -p "$INCLUDE_DIR"
+    
+    # Copy timer include file
+    cp "$BASE_DIR/configs/sourcemod/scripting/include/timer.inc" "$INCLUDE_DIR/timer.inc"
+}
+
 # Main installation routine
 main() {
     log_message "Starting Nans Surf CS2 Server Installation..."
@@ -268,6 +280,7 @@ main() {
     download_maps
     compile_local_plugins
     setup_steam_account
+    copy_include_files
     
     # Set correct permissions
     chmod -R 755 "$SOURCEMOD_DIR"

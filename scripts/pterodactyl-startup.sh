@@ -108,8 +108,8 @@ main() {
         +map "$STARTUP_MAP" \
         -maxplayers "$MAX_PLAYERS" \
         +sv_setsteamaccount "${STEAM_ACCOUNT:-}" \
-        +exec "/home/container/game/csgo/cfg/server.cfg" \
-        +exec "/home/container/game/csgo/cfg/workshop_maps.cfg" \
+        +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/server.cfg" \
+        +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/workshop_maps.cfg" \
         ${CUSTOM_STARTUP_ARGS}
 }
 
