@@ -75,11 +75,6 @@ COPY        --chown=container:container ./gamefiles/configs/sourcemod/surf/ /hom
 # Copy plugins if they exist
 COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home/container/game/csgo/addons/sourcemod/plugins/
 
-# Copy optional content (using temporary directories to handle missing folders)
-COPY        --chown=container:container ./gamefiles/materials/ /home/container/tmp/materials/
-COPY        --chown=container:container ./gamefiles/models/ /home/container/tmp/models/
-COPY        --chown=container:container ./gamefiles/data/ /home/container/tmp/data/
-
 # Move optional content to final location if it exists
 RUN         if [ "$(ls -A /home/container/tmp/materials)" ]; then \
                 cp -r /home/container/tmp/materials/* /home/container/game/csgo/materials/; \
