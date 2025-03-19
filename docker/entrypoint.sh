@@ -341,7 +341,17 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     
     # Add Steam initialization parameters
     if [[ ${MODIFIED_STARTUP} != *"-steam"* ]]; then
-        MODIFIED_STARTUP="${MODIFIED_STARTUP} -steam -steamcmd"
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} -steam -steamcmd -steamloader -insecure +sv_setsteamaccount 7912CB397FC178ACF5E752CA6B4D75A3"
+    fi
+    
+    # Add game-specific parameters
+    if [[ ${MODIFIED_STARTUP} != *"+game_type"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +game_type 0 +game_mode 0 +mapgroup mg_active"
+    fi
+    
+    # Add Steam API initialization parameters
+    if [[ ${MODIFIED_STARTUP} != *"+steam_runtime_heavy"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +steam_runtime_heavy 1 +steam_runtime 1"
     fi
     
     # Add sv_downloadurl if it doesn't exist and FASTDL_URL is provided
