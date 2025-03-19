@@ -42,10 +42,22 @@ if [ ! -z ${SRCDS_APPID} ]; then
         mkdir -p /home/container/game/bin/linuxsteamrt64
         ln -sf /home/container/.steam/sdk64/steamclient.so /home/container/game/bin/linuxsteamrt64/steamclient.so
         
-        # Handle libserver_valve.so - create empty file if it doesn't exist
-        if [ ! -f "/home/container/game/bin/linuxsteamrt64/libserver_valve.so" ]; then
-            echo "Creating placeholder for libserver_valve.so"
-            touch /home/container/game/bin/linuxsteamrt64/libserver_valve.so
+        # Create a proper libserver_valve.so file
+        echo "Creating proper libserver_valve.so"
+        cat > /home/container/libserver_valve_create.c << 'EOL'
+// Empty C file to create a minimal shared library
+int dummy_function() {
+    return 0;
+}
+EOL
+        # Compile a proper dummy shared library (minimum viable .so)
+        gcc -shared -fPIC -o /home/container/game/bin/linuxsteamrt64/libserver_valve.so /home/container/libserver_valve_create.c
+
+        # If compilation fails, try using a precompiled library or another approach
+        if [ ! -s "/home/container/game/bin/linuxsteamrt64/libserver_valve.so" ]; then
+            echo "GCC compilation failed, using alternative method for libserver_valve.so"
+            # Create binary data that looks like a valid .so file (minimal ELF header)
+            printf "\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x3e\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x0d\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" > /home/container/game/bin/linuxsteamrt64/libserver_valve.so
         fi
         
         # Set LD_LIBRARY_PATH
@@ -200,6 +212,18 @@ chmod +x /home/container/install_surf.sh
 echo "Installing surf components..."
 /bin/bash /home/container/install_surf.sh
 
+# Configure firewall rules for CS2 if iptables is available
+if command -v iptables >/dev/null 2>&1; then
+    echo "Setting up firewall rules for CS2 server..."
+    iptables -F
+    iptables -A INPUT -p udp --dport 25566 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 25566 -j ACCEPT
+    iptables -A INPUT -p udp --dport 27005 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 27005 -j ACCEPT
+    iptables -A INPUT -p udp --dport 27020 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 27020 -j ACCEPT
+fi
+
 # Replace Startup Variables
 MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
 echo ":/home/container$ ${MODIFIED_STARTUP}"
@@ -218,7 +242,9 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     fi
     
     if [[ ${MODIFIED_STARTUP} != *"+net_public_adr"* ]]; then
-        MODIFIED_STARTUP="${MODIFIED_STARTUP} +net_public_adr ${EXTERNAL_IP:-$INTERNAL_IP}"
+        # Get actual public IP if available
+        PUBLIC_IP=$(curl -s -4 https://api.ipify.org 2>/dev/null || echo ${EXTERNAL_IP:-$INTERNAL_IP})
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +net_public_adr ${PUBLIC_IP}"
     fi
     
     if [[ ${MODIFIED_STARTUP} != *"+clientport"* ]]; then
@@ -233,7 +259,21 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     if [[ ${MODIFIED_STARTUP} != *"+sv_lan"* ]]; then
         MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_lan 0"
     fi
-fi
+    
+    # Add connection requirements
+    if [[ ${MODIFIED_STARTUP} != *"+sv_visiblemaxplayers"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_visiblemaxplayers 24"
+    fi
+    
+    if [[ ${MODIFIED_STARTUP} != *"+sv_steamauth_enforce"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_steamauth_enforce 0"
+    fi
+    
+    # Add sv_downloadurl if it doesn't exist and FASTDL_URL is provided
+    if [[ ${MODIFIED_STARTUP} != *"+sv_downloadurl"* ]] && [[ ! -z ${FASTDL_URL} ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_downloadurl ${FASTDL_URL}"
+    fi
+}
 
 echo "Final startup command: ${MODIFIED_STARTUP}"
 

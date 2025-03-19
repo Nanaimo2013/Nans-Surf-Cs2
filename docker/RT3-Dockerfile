@@ -24,7 +24,9 @@ RUN         apt update && \
             net-tools \
             iputils-ping \
             netcat \
-            iptables && \
+            iptables \
+            gcc \
+            build-essential && \
             apt-get clean
 
 # Set up locales
