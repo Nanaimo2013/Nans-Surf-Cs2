@@ -14,11 +14,19 @@ public Plugin myinfo =
     url = ""
 };
 
+// Point structure to store coordinates
+enum struct Point
+{
+    float x;
+    float y;
+    float z;
+}
+
 // Zone Types
 enum struct ZoneType
 {
     int type;
-    float points[8][3];
+    Point points[8];  // Store 8 points
     int entity;
     bool active;
 }
@@ -252,10 +260,9 @@ void CreateZone(int client, int type)
     // Set initial points (create a cube around player position)
     for (int i = 0; i < 8; i++)
     {
-        zone.points[i] = pos;
-        zone.points[i][0] += (i & 1) ? 50.0 : -50.0;
-        zone.points[i][1] += (i & 2) ? 50.0 : -50.0;
-        zone.points[i][2] += (i & 4) ? 100.0 : 0.0;
+        zone.points[i].x = pos[0] + (i & 1 ? 50.0 : -50.0);
+        zone.points[i].y = pos[1] + (i & 2 ? 50.0 : -50.0);
+        zone.points[i].z = pos[2] + (i & 4 ? 100.0 : 0.0);
     }
     
     // Create zone entity
@@ -301,19 +308,22 @@ int CreateZoneEntity(ZoneType zone)
 void GetZoneMinsMaxs(ZoneType zone, float mins[3], float maxs[3])
 {
     // Initialize with first point
-    mins = zone.points[0];
-    maxs = zone.points[0];
+    mins[0] = zone.points[0].x;
+    mins[1] = zone.points[0].y;
+    mins[2] = zone.points[0].z;
+    maxs[0] = zone.points[0].x;
+    maxs[1] = zone.points[0].y;
+    maxs[2] = zone.points[0].z;
     
     // Find min and max values
     for (int i = 1; i < 8; i++)
     {
-        for (int j = 0; j < 3; j++)
-        {
-            if (zone.points[i][j] < mins[j])
-                mins[j] = zone.points[i][j];
-            if (zone.points[i][j] > maxs[j])
-                maxs[j] = zone.points[i][j];
-        }
+        if (zone.points[i].x < mins[0]) mins[0] = zone.points[i].x;
+        if (zone.points[i].y < mins[1]) mins[1] = zone.points[i].y;
+        if (zone.points[i].z < mins[2]) mins[2] = zone.points[i].z;
+        if (zone.points[i].x > maxs[0]) maxs[0] = zone.points[i].x;
+        if (zone.points[i].y > maxs[1]) maxs[1] = zone.points[i].y;
+        if (zone.points[i].z > maxs[2]) maxs[2] = zone.points[i].z;
     }
 }
 
@@ -417,6 +427,13 @@ void RestartTimer(int client)
     StartTimer(client);
 }
 
+void FormatTimeFloat(float time, char[] buffer, int maxlen)
+{
+    int minutes = RoundToFloor(time / 60.0);
+    float seconds = time - float(minutes * 60);
+    Format(buffer, maxlen, "%02d:%06.3f", minutes, seconds);
+}
+
 void FinishTimer(int client)
 {
     if (!g_bTimerRunning[client])
@@ -427,7 +444,7 @@ void FinishTimer(int client)
     g_bTimerRunning[client] = false;
     
     char timeStr[32];
-    FormatTime(time, timeStr, sizeof(timeStr));
+    FormatTimeFloat(time, timeStr, sizeof(timeStr));
     PrintToChat(client, " \x04[Timer]\x01 Finished in %s!", timeStr);
 }
 
@@ -440,7 +457,7 @@ void HandleCheckpoint(int client)
     float time = GetGameTime() - g_fStartTime[client];
     
     char timeStr[32];
-    FormatTime(time, timeStr, sizeof(timeStr));
+    FormatTimeFloat(time, timeStr, sizeof(timeStr));
     PrintToChat(client, " \x04[Timer]\x01 Checkpoint %d: %s", g_iCurrentCheckpoint[client], timeStr);
 }
 
@@ -462,13 +479,6 @@ void ResetTimer(int client)
     g_iCurrentCheckpoint[client] = 0;
 }
 
-void FormatTime(float time, char[] buffer, int maxlen)
-{
-    int minutes = RoundToFloor(time / 60.0);
-    float seconds = time - float(minutes * 60);
-    Format(buffer, maxlen, "%d:%05.2f", minutes, seconds);
-}
-
 public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
@@ -487,4 +497,82 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
         StopTimer(client);
     }
     return Plugin_Continue;
+}
+
+void ShowDeleteZoneMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_DeleteZone);
+    menu.SetTitle("Delete Zone Menu");
+    
+    char buffer[64];
+    for (int i = 0; i < g_MapZones.Length; i++)
+    {
+        ZoneType zone;
+        g_MapZones.GetArray(i, zone);
+        
+        if (zone.active)
+        {
+            switch (zone.type)
+            {
+                case ZONE_START:
+                    Format(buffer, sizeof(buffer), "Start Zone %d", i);
+                case ZONE_END:
+                    Format(buffer, sizeof(buffer), "End Zone %d", i);
+                case ZONE_CHECKPOINT:
+                    Format(buffer, sizeof(buffer), "Checkpoint %d", i);
+                case ZONE_BONUS_START:
+                    Format(buffer, sizeof(buffer), "Bonus Start %d", i);
+                case ZONE_BONUS_END:
+                    Format(buffer, sizeof(buffer), "Bonus End %d", i);
+                default:
+                    Format(buffer, sizeof(buffer), "Unknown Zone %d", i);
+            }
+            
+            char indexStr[8];
+            IntToString(i, indexStr, sizeof(indexStr));
+            menu.AddItem(indexStr, buffer);
+        }
+    }
+    
+    menu.ExitButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_DeleteZone(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[32];
+            menu.GetItem(param2, info, sizeof(info));
+            
+            int index = StringToInt(info);
+            if (index >= 0 && index < g_MapZones.Length)
+            {
+                ZoneType zone;
+                g_MapZones.GetArray(index, zone);
+                
+                // Remove the zone entity if it exists
+                if (zone.entity > 0 && IsValidEntity(zone.entity))
+                {
+                    AcceptEntityInput(zone.entity, "Kill");
+                }
+                
+                // Mark zone as inactive
+                zone.active = false;
+                g_MapZones.SetArray(index, zone);
+                
+                PrintToChat(param1, "[Timer] Zone deleted successfully.");
+                SaveZones(); // Save changes to config
+            }
+            
+            ShowZoneMenu(param1); // Return to main zone menu
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+    return 0;
 } 
