@@ -56,6 +56,7 @@ RUN         useradd -m -d /home/container -s /bin/bash container && \
             mkdir -p /home/container/game/csgo/sound && \
             mkdir -p /home/container/game/csgo/addons/sourcemod/plugins && \
             mkdir -p /home/container/game/csgo/addons/sourcemod/data && \
+            mkdir -p /home/container/game/csgo/addons/sourcemod/configs && \
             chown -R container:container /home/container
 
 # Switch to container user
@@ -63,17 +64,43 @@ USER        container
 ENV         USER=container HOME=/home/container
 WORKDIR     /home/container
 
-# Copy game files
-COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home/container/game/csgo/addons/sourcemod/plugins/
+# Create empty directories for optional content
+RUN         mkdir -p /home/container/tmp/materials && \
+            mkdir -p /home/container/tmp/models && \
+            mkdir -p /home/container/tmp/sound && \
+            mkdir -p /home/container/tmp/data
+
+# Copy configuration files
 COPY        --chown=container:container ./gamefiles/configs/core/* /home/container/game/csgo/cfg/
 COPY        --chown=container:container ./gamefiles/configs/sourcemod/* /home/container/game/csgo/cfg/sourcemod/
-COPY        --chown=container:container ./gamefiles/materials /home/container/game/csgo/materials/
-COPY        --chown=container:container ./gamefiles/models /home/container/game/csgo/models/
-COPY        --chown=container:container ./gamefiles/sound /home/container/game/csgo/sound/
-COPY        --chown=container:container ./gamefiles/data /home/container/game/csgo/addons/sourcemod/data/
-COPY        --chown=container:container ./docker/entrypoint.sh /entrypoint.sh
+COPY        --chown=container:container ./gamefiles/configs/sourcemod/surf/ /home/container/game/csgo/cfg/sourcemod/surf/
 
-# Make scripts executable
+# Copy plugins if they exist
+COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home/container/game/csgo/addons/sourcemod/plugins/
+
+# Copy optional content (using temporary directories to handle missing folders)
+COPY        --chown=container:container ./gamefiles/materials/ /home/container/tmp/materials/
+COPY        --chown=container:container ./gamefiles/models/ /home/container/tmp/models/
+COPY        --chown=container:container ./gamefiles/sound/ /home/container/tmp/sound/
+COPY        --chown=container:container ./gamefiles/data/ /home/container/tmp/data/
+
+# Move optional content to final location if it exists
+RUN         if [ "$(ls -A /home/container/tmp/materials)" ]; then \
+                cp -r /home/container/tmp/materials/* /home/container/game/csgo/materials/; \
+            fi && \
+            if [ "$(ls -A /home/container/tmp/models)" ]; then \
+                cp -r /home/container/tmp/models/* /home/container/game/csgo/models/; \
+            fi && \
+            if [ "$(ls -A /home/container/tmp/sound)" ]; then \
+                cp -r /home/container/tmp/sound/* /home/container/game/csgo/sound/; \
+            fi && \
+            if [ "$(ls -A /home/container/tmp/data)" ]; then \
+                cp -r /home/container/tmp/data/* /home/container/game/csgo/addons/sourcemod/data/; \
+            fi && \
+            rm -rf /home/container/tmp
+
+# Copy entrypoint script
+COPY        --chown=container:container ./docker/entrypoint.sh /entrypoint.sh
 RUN         chmod +x /entrypoint.sh
 
 # Set default environment variables
