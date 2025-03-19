@@ -45,20 +45,56 @@ if [ ! -z ${SRCDS_APPID} ]; then
         # Create a proper libserver_valve.so file
         echo "Creating proper libserver_valve.so"
         cat > /home/container/libserver_valve_create.c << 'EOL'
-// Empty C file to create a minimal shared library
-int dummy_function() {
+#include <stddef.h>
+#include <stdlib.h>
+
+// Common server interface functions
+void* CreateInterface(const char* name, int* ret) {
+    if (ret) *ret = 0;
+    return NULL;
+}
+
+int ServerFactory(const char* name, void** factory) {
+    if (factory) *factory = NULL;
     return 0;
 }
-EOL
-        # Compile a proper dummy shared library (minimum viable .so)
-        gcc -shared -fPIC -o /home/container/game/bin/linuxsteamrt64/libserver_valve.so /home/container/libserver_valve_create.c
 
-        # If compilation fails, try using a precompiled library or another approach
-        if [ ! -s "/home/container/game/bin/linuxsteamrt64/libserver_valve.so" ]; then
-            echo "GCC compilation failed, using alternative method for libserver_valve.so"
-            # Create binary data that looks like a valid .so file (minimal ELF header)
-            printf "\x7f\x45\x4c\x46\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\x00\x3e\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x40\x00\x38\x00\x0d\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x05\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" > /home/container/game/bin/linuxsteamrt64/libserver_valve.so
+void* Sys_GetFactory(const char* name) {
+    return NULL;
+}
+
+// Export symbols
+__attribute__((visibility("default")))
+void* CreateInterface_valve(const char* name, int* ret) {
+    return CreateInterface(name, ret);
+}
+
+__attribute__((visibility("default")))
+int ServerFactory_valve(const char* name, void** factory) {
+    return ServerFactory(name, factory);
+}
+
+__attribute__((visibility("default")))
+void* Sys_GetFactory_valve(const char* name) {
+    return Sys_GetFactory(name);
+}
+EOL
+        # Compile with proper flags for a shared library
+        gcc -shared -fPIC -O2 -Wall -o /home/container/game/bin/linuxsteamrt64/libserver_valve.so /home/container/libserver_valve_create.c
+
+        # Verify the file was created and has the correct format
+        if [ ! -s "/home/container/game/bin/linuxsteamrt64/libserver_valve.so" ] || ! file /home/container/game/bin/linuxsteamrt64/libserver_valve.so | grep -q "shared object"; then
+            echo "GCC compilation failed or produced invalid shared library, using alternative method"
+            # Create a minimal valid shared library with basic ELF structure
+            cat > /home/container/minimal_lib.c << 'EOL'
+void _init(void) {}
+void _fini(void) {}
+EOL
+            gcc -shared -fPIC -nostartfiles -o /home/container/game/bin/linuxsteamrt64/libserver_valve.so /home/container/minimal_lib.c
         fi
+
+        # Set proper permissions
+        chmod 755 /home/container/game/bin/linuxsteamrt64/libserver_valve.so
         
         # Set LD_LIBRARY_PATH
         export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
@@ -215,14 +251,48 @@ echo "Installing surf components..."
 # Configure firewall rules for CS2 if iptables is available
 if command -v iptables >/dev/null 2>&1; then
     echo "Setting up firewall rules for CS2 server..."
-    iptables -F
-    iptables -A INPUT -p udp --dport 25566 -j ACCEPT
-    iptables -A INPUT -p tcp --dport 25566 -j ACCEPT
-    iptables -A INPUT -p udp --dport 27005 -j ACCEPT
-    iptables -A INPUT -p tcp --dport 27005 -j ACCEPT
-    iptables -A INPUT -p udp --dport 27020 -j ACCEPT
-    iptables -A INPUT -p tcp --dport 27020 -j ACCEPT
+    # Only try to set firewall rules if we have root permissions
+    if [ "$(id -u)" = "0" ]; then
+        iptables -F
+        # UDP ports
+        iptables -A INPUT -p udp -m udp --dport 25566 -j ACCEPT
+        iptables -A INPUT -p udp -m udp --dport 27005 -j ACCEPT
+        iptables -A INPUT -p udp -m udp --dport 27020 -j ACCEPT
+        # TCP ports
+        iptables -A INPUT -p tcp -m tcp --dport 25566 -j ACCEPT
+        iptables -A INPUT -p tcp -m tcp --dport 27005 -j ACCEPT
+        iptables -A INPUT -p tcp -m tcp --dport 27020 -j ACCEPT
+    else
+        echo "Warning: Not running as root, skipping firewall configuration"
+    fi
 fi
+
+# Create Steam initialization script
+cat > /home/container/steam_init.sh << 'EOL'
+#!/bin/bash
+# Set Steam environment variables
+export STEAMROOT=/home/container/.steam
+export STEAMAPP=730
+export STEAMAPPID=730
+export STEAMCMD=/home/container/steamcmd/steamcmd.sh
+export STEAMCMDDIR=/home/container/steamcmd
+export STEAMGAME=csgo
+export SteamAppId=730
+export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
+
+# Create Steam runtime symlinks
+mkdir -p /home/container/.steam/sdk32
+mkdir -p /home/container/.steam/sdk64
+ln -sf /home/container/steamcmd/linux32/steamclient.so /home/container/.steam/sdk32/steamclient.so
+ln -sf /home/container/steamcmd/linux64/steamclient.so /home/container/.steam/sdk64/steamclient.so
+
+# Create Steam appid file
+echo $STEAMAPPID > /home/container/game/steam_appid.txt
+EOL
+chmod +x /home/container/steam_init.sh
+
+# Run Steam initialization
+source /home/container/steam_init.sh
 
 # Replace Startup Variables
 MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
@@ -269,11 +339,16 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
         MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_steamauth_enforce 0"
     fi
     
+    # Add Steam initialization parameters
+    if [[ ${MODIFIED_STARTUP} != *"-steam"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} -steam -steamcmd"
+    fi
+    
     # Add sv_downloadurl if it doesn't exist and FASTDL_URL is provided
     if [[ ${MODIFIED_STARTUP} != *"+sv_downloadurl"* ]] && [[ ! -z ${FASTDL_URL} ]]; then
         MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_downloadurl ${FASTDL_URL}"
     fi
-}
+fi
 
 echo "Final startup command: ${MODIFIED_STARTUP}"
 
