@@ -220,6 +220,14 @@ compile_local_plugins() {
     # Ensure plugins directory exists
     mkdir -p "$PLUGINS_DIR/nans_surftimer"
     
+    # Find spcomp compiler
+    local spcomp_path=$(find "$SOURCEMOD_DIR" -name "spcomp" | head -n 1)
+    
+    if [ -z "$spcomp_path" ]; then
+        log_message "ERROR: SourcePawn compiler not found. Skipping plugin compilation."
+        return
+    fi
+    
     # List of standard SourceMod plugins to completely skip
     local skip_plugins=(
         "adminmenu.sp"
@@ -247,7 +255,7 @@ compile_local_plugins() {
         log_message "Compiling $plugin_name"
         
         # Compile with include paths and maximum error tolerance
-        compilation_output=$(cd "$SCRIPTING_DIR" && ./spcomp -E -i"$INCLUDE_DIR" "$plugin" -o"$output_plugin" 2>&1)
+        compilation_output=$(cd "$SCRIPTING_DIR" && "$spcomp_path" -E -i"$INCLUDE_DIR" "$plugin" -o"$output_plugin" 2>&1)
         
         # Check compilation status
         if [ $? -ne 0 ]; then
@@ -280,8 +288,51 @@ copy_include_files() {
     # Ensure include directory exists
     mkdir -p "$INCLUDE_DIR"
     
-    # Copy timer include file
-    cp "$BASE_DIR/configs/sourcemod/scripting/include/timer.inc" "$INCLUDE_DIR/timer.inc"
+    # Create timer include file if it doesn't exist
+    local timer_inc_path="$INCLUDE_DIR/timer.inc"
+    if [ ! -f "$timer_inc_path" ]; then
+        log_message "Creating timer.inc include file"
+        echo '#if defined _timer_included
+ #endinput
+#endif
+#define _timer_included
+
+#include <sourcemod>
+#include <sdktools>
+
+// Basic client validation
+stock bool IsValidClient(int client, bool bAlive = false) {
+    if (client < 1 || client > MaxClients) return false;
+    if (!IsClientConnected(client)) return false;
+    if (!IsClientInGame(client)) return false;
+    if (bAlive && !IsPlayerAlive(client)) return false;
+    return true;
+}
+
+// Compatibility print to chat function
+stock void CPrintToChat(int client, const char[] message, any ...) {
+    char buffer[256];
+    VFormat(buffer, sizeof(buffer), message, 3);
+    PrintToChat(client, buffer);
+}
+
+// Placeholder functions for undefined symbols
+stock void GetCurrentMapName(char[] buffer, int maxlen) {
+    GetCurrentMap(buffer, maxlen);
+}
+
+stock void GetReplayTypeName(int type, char[] buffer, int maxlen) {
+    strcopy(buffer, maxlen, "Unknown");
+}
+
+stock void GetLeaderboardTypeName(int type, char[] buffer, int maxlen) {
+    strcopy(buffer, maxlen, "Unknown");
+}
+
+stock void GetMapTierName(int tier, char[] buffer, int maxlen) {
+    strcopy(buffer, maxlen, "Unknown");
+}' > "$timer_inc_path"
+    fi
 }
 
 # Main installation routine

@@ -64,7 +64,10 @@ perform_first_time_install() {
 validate_env_vars() {
     # Steam Account Token
     if [ -z "${STEAM_ACCOUNT:-}" ]; then
-        log_message "WARNING: Steam Account Token is not set. Server may not start correctly."
+        log_message "ERROR: Steam Account Token is REQUIRED. Server cannot start without it."
+        log_message "Please set the STEAM_ACCOUNT environment variable in your Pterodactyl panel."
+        log_message "You can obtain a token from: https://steamcommunity.com/dev/managegameservers"
+        exit 1
     fi
 
     # Server Port
@@ -77,7 +80,7 @@ validate_env_vars() {
 prepare_startup_params() {
     # Default map and settings
     STARTUP_MAP="${SRCDS_MAP:-surf_beginner}"
-    MAX_PLAYERS="${SRCDS_MAXPLAYERS:-32}"
+    MAX_PLAYERS="${SRCDS_MAXPLAYERS:-64}"
 
     # Prepare custom arguments
     CUSTOM_ARGS="${CUSTOM_STARTUP_ARGS:-}"
@@ -107,10 +110,10 @@ main() {
         -port "${SERVER_PORT}" \
         +map "$STARTUP_MAP" \
         -maxplayers "$MAX_PLAYERS" \
-        +sv_setsteamaccount "${STEAM_ACCOUNT:-}" \
+        +sv_setsteamaccount "${STEAM_ACCOUNT}" \
         +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/server.cfg" \
         +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/workshop_maps.cfg" \
-        ${CUSTOM_STARTUP_ARGS}
+        ${CUSTOM_ARGS}
 }
 
 # Execute main routine
