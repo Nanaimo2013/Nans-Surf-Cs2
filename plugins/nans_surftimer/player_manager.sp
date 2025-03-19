@@ -2,9 +2,33 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <cstrike>
+#include <timer>
 
 #define MAX_PLAYER_RANKS 10
+
+enum struct PlayerRecord {
+    char SteamID[32];
+    float BestTime;
+    int Rank;
+    int Points;
+    int Tier;
+}
+
+methodmap PlayerManager {
+    public static void SavePlayerRecord(PlayerRecord record) {
+        // Placeholder implementation
+    }
+
+    public static PlayerRecord GetPlayerRecord(const char[] steamId) {
+        PlayerRecord record;
+        strcopy(record.SteamID, sizeof(record.SteamID), steamId);
+        record.BestTime = 0.0;
+        record.Rank = 0;
+        record.Points = 0;
+        record.Tier = 1;
+        return record;
+    }
+}
 
 enum PlayerRank {
     RANK_UNRANKED = 0,

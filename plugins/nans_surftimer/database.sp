@@ -2,6 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <timer>
 
 #define DATABASE_VERSION 1
 #define MAX_MAP_NAME 128
@@ -24,11 +25,11 @@ enum struct MapRecord {
 
 methodmap SurfDatabase {
     public SurfDatabase() {
-        this.CreateDatabaseDirectories();
-        this.EnsureDatabaseVersion();
+        CreateDatabaseDirectories();
+        EnsureDatabaseVersion();
     }
 
-    public void CreateDatabaseDirectories() {
+    public static void CreateDatabaseDirectories() {
         char path[PLATFORM_MAX_PATH];
         BuildPath(Path_SM, path, sizeof(path), "data/surftimer");
         if (!DirExists(path)) {
@@ -53,7 +54,7 @@ methodmap SurfDatabase {
         }
     }
 
-    public void EnsureDatabaseVersion() {
+    public static void EnsureDatabaseVersion() {
         char path[PLATFORM_MAX_PATH];
         BuildPath(Path_SM, path, sizeof(path), "data/surftimer/version.txt");
 

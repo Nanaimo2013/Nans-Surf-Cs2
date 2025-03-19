@@ -1,0 +1,24 @@
+name: Publish Docker Image
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  publish-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build & Publish Docker image
+        run: |
+          docker build . -t ghcr.io/nookure/cs2-surf:latest -f docker/RT3-Dockerfile
+          docker push ghcr.io/nookure/cs2-surf:latest 

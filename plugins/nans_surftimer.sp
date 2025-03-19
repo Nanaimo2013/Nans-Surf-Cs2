@@ -1,338 +1,490 @@
-#pragma semicolon 1
-#pragma newdecls required
-
 #include <sourcemod>
 #include <sdktools>
 #include <cstrike>
 
-#define PLUGIN_VERSION "1.0.0"
-#define MAX_ZONES 64
-#define MAX_STYLES 8
+#pragma semicolon 1
+#pragma newdecls required
 
-// Database connection handle
-Database g_Database = null;
-
-// Player timer data structure
-enum struct PlayerTimer {
-    int StartTime;
-    int CurrentZone;
-    float BestTime;
-    float CurrentTime;
-    bool IsRunning;
-    int Checkpoints[MAX_ZONES];
-}
-
-// Zone types
-enum ZoneType {
-    ZONE_START = 0,
-    ZONE_END,
-    ZONE_CHECKPOINT,
-    ZONE_STAGE
-}
-
-// Surf styles
-enum SurfStyle {
-    STYLE_NORMAL = 0,
-    STYLE_SIDEWAYS,
-    STYLE_BACKWARDS,
-    STYLE_HALF_SIDEWAYS,
-    STYLE_AUTO_BHOP,
-    STYLE_SCROLL
-}
-
-// Global variables
-PlayerTimer g_PlayerTimers[MAXPLAYERS + 1];
-ArrayList g_MapZones;
-int g_TotalZones = 0;
-char g_sCurrentMap[128];
-
-public Plugin myinfo = {
+public Plugin myinfo = 
+{
     name = "Nans Surf Timer",
-    author = "Nanaimo_2013",
-    description = "Advanced Surf Timer for CS2",
-    version = PLUGIN_VERSION,
+    author = "Nans",
+    description = "Timer system for surf maps",
+    version = "1.0.0",
     url = ""
 };
 
-public void OnPluginStart() {
-    // Create ConVars
-    CreateConVar("sm_surftimer_version", PLUGIN_VERSION, "Nans Surf Timer Version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+// Zone Types
+enum struct ZoneType
+{
+    int type;
+    float points[8][3];
+    int entity;
+    bool active;
+}
+
+// Zone Definitions
+#define ZONE_START 0
+#define ZONE_END 1
+#define ZONE_CHECKPOINT 2
+#define ZONE_BONUS_START 3
+#define ZONE_BONUS_END 4
+
+// Global Variables
+ArrayList g_MapZones;
+bool g_bTimerRunning[MAXPLAYERS + 1];
+float g_fStartTime[MAXPLAYERS + 1];
+float g_fCurrentTime[MAXPLAYERS + 1];
+int g_iCurrentCheckpoint[MAXPLAYERS + 1];
+
+public void OnPluginStart()
+{
+    // Initialize arrays
+    g_MapZones = new ArrayList(sizeof(ZoneType));
     
     // Register commands
-    RegConsoleCmd("sm_timer", Command_Timer, "Show current timer status");
-    RegConsoleCmd("sm_checkpoint", Command_Checkpoint, "Save a checkpoint");
-    RegConsoleCmd("sm_teleport", Command_Teleport, "Teleport to last checkpoint");
-    RegConsoleCmd("sm_restart", Command_Restart, "Restart your run");
-    RegConsoleCmd("sm_top", Command_TopTimes, "Show top times");
+    RegConsoleCmd("sm_timer", Command_Timer, "Timer commands");
+    RegConsoleCmd("sm_checkpoint", Command_Checkpoint, "Show checkpoint menu");
+    RegAdminCmd("sm_zone", Command_Zone, ADMFLAG_RCON, "Zone management commands");
     
     // Hook events
     HookEvent("player_spawn", Event_PlayerSpawn);
-    HookEvent("round_start", Event_RoundStart);
+    HookEvent("player_death", Event_PlayerDeath);
     
-    // Initialize database connection
-    ConnectToDatabase();
+    // Load translations
+    LoadTranslations("common.phrases");
 }
 
-void ConnectToDatabase() {
-    char error[256];
-    g_Database = SQL_Connect("surftimer", true, error, sizeof(error));
+public void OnMapStart()
+{
+    // Clear existing zones
+    g_MapZones.Clear();
     
-    if (g_Database == null) {
-        LogError("Failed to connect to database: %s", error);
-        return;
+    // Load zones from config
+    LoadZones();
+    
+    // Create timer for checking zones
+    CreateTimer(0.1, Timer_CheckZones, _, TIMER_REPEAT);
+}
+
+public void OnClientPutInServer(int client)
+{
+    ResetTimer(client);
+}
+
+public void OnClientDisconnect(int client)
+{
+    ResetTimer(client);
+}
+
+public Action Command_Timer(int client, int args)
+{
+    if (client == 0)
+    {
+        ReplyToCommand(client, "[SM] This command can only be used in-game.");
+        return Plugin_Handled;
     }
     
-    // Create necessary tables
-    char query[1024];
-    Format(query, sizeof(query), 
-        "CREATE TABLE IF NOT EXISTS `surf_times` (" ...
-        "`steamid` VARCHAR(32) NOT NULL, " ...
-        "`map` VARCHAR(128) NOT NULL, " ...
-        "`style` INT NOT NULL, " ...
-        "`time` FLOAT NOT NULL, " ...
-        "`timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " ...
-        "PRIMARY KEY (`steamid`, `map`, `style`)" ...
-        ")");
-    
-    SQL_FastQuery(g_Database, query);
-}
-
-public void OnMapStart() {
-    // Get current map name
-    GetCurrentMap(g_sCurrentMap, sizeof(g_sCurrentMap));
-
-    // Load map zones
-    LoadMapZones();
-    
-    // Reset all player timers
-    for (int i = 1; i <= MaxClients; i++) {
-        ResetPlayerTimer(i);
-    }
-}
-
-void LoadMapZones() {
-    // Load zones from database or configuration file
-    g_MapZones = new ArrayList(sizeof(ZoneType));
-    
-    // Placeholder for zone loading logic
-    // This would typically read from a database or config file
-}
-
-void ResetPlayerTimer(int client) {
-    g_PlayerTimers[client].StartTime = 0;
-    g_PlayerTimers[client].CurrentZone = 0;
-    g_PlayerTimers[client].BestTime = 0.0;
-    g_PlayerTimers[client].CurrentTime = 0.0;
-    g_PlayerTimers[client].IsRunning = false;
-    
-    for (int i = 0; i < MAX_ZONES; i++) {
-        g_PlayerTimers[client].Checkpoints[i] = 0;
-    }
-}
-
-public Action Command_Timer(int client, int args) {
-    if (!IsValidClient(client)) return Plugin_Handled;
-    
-    float currentTime = g_PlayerTimers[client].CurrentTime;
-    int currentZone = g_PlayerTimers[client].CurrentZone;
-    
-    PrintToChat(client, "\x04[Surf Timer]\x01 Current Time: %.2f | Current Zone: %d", currentTime, currentZone);
-    
+    ShowTimerMenu(client);
     return Plugin_Handled;
 }
 
-public Action Command_Checkpoint(int client, int args) {
-    if (!IsValidClient(client)) return Plugin_Handled;
+public Action Command_Checkpoint(int client, int args)
+{
+    if (client == 0)
+    {
+        ReplyToCommand(client, "[SM] This command can only be used in-game.");
+        return Plugin_Handled;
+    }
     
-    // Save current position as checkpoint
-    float origin[3];
-    GetClientAbsOrigin(client, origin);
-    
-    int currentZone = g_PlayerTimers[client].CurrentZone;
-    g_PlayerTimers[client].Checkpoints[currentZone] = GetTime();
-    
-    PrintToChat(client, "\x04[Surf Timer]\x01 Checkpoint saved at zone %d", currentZone);
-    
+    ShowCheckpointMenu(client);
     return Plugin_Handled;
 }
 
-public Action Command_Teleport(int client, int args) {
-    if (!IsValidClient(client)) return Plugin_Handled;
-    
-    int currentZone = g_PlayerTimers[client].CurrentZone;
-    int checkpointTime = g_PlayerTimers[client].Checkpoints[currentZone];
-    
-    if (checkpointTime > 0) {
-        // Teleport logic would go here
-        PrintToChat(client, "\x04[Surf Timer]\x01 Teleported to checkpoint");
-    } else {
-        PrintToChat(client, "\x04[Surf Timer]\x01 No checkpoint available");
+public Action Command_Zone(int client, int args)
+{
+    if (client == 0)
+    {
+        ReplyToCommand(client, "[SM] This command can only be used in-game.");
+        return Plugin_Handled;
     }
     
+    ShowZoneMenu(client);
     return Plugin_Handled;
 }
 
-public Action Command_Restart(int client, int args) {
-    if (!IsValidClient(client)) return Plugin_Handled;
+void ShowTimerMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_Timer);
+    menu.SetTitle("Timer Menu");
     
-    ResetPlayerTimer(client);
-    PrintToChat(client, "\x04[Surf Timer]\x01 Run restarted");
+    menu.AddItem("start", "Start Timer");
+    menu.AddItem("stop", "Stop Timer");
+    menu.AddItem("restart", "Restart Timer");
     
-    return Plugin_Handled;
+    menu.ExitButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
 }
 
-public Action Command_TopTimes(int client, int args) {
-    if (!IsValidClient(client) || g_Database == null) return Plugin_Handled;
-    
-    // Fetch top times from database
-    char query[512];
-    Format(query, sizeof(query), 
-        "SELECT steamid, time, style FROM surf_times " ...
-        "WHERE map = '%s' ORDER BY time ASC LIMIT 10", 
-        g_sCurrentMap);
-    
-    SQL_TQuery(g_Database, TopTimesCallback, query, GetClientUserId(client));
-    
-    return Plugin_Handled;
-}
-
-public void TopTimesCallback(Handle owner, Handle hndl, const char[] error, any data) {
-    int client = GetClientOfUserId(data);
-    
-    if (!IsValidClient(client)) return;
-    
-    if (hndl == INVALID_HANDLE) {
-        LogError("Top Times Query Error: %s", error);
-        return;
-    }
-    
-    PrintToChat(client, "\x04[Surf Timer]\x01 Top Times:");
-    
-    int rank = 1;
-    while (SQL_FetchRow(hndl)) {
-        char steamid[32];
-        float time;
-        int style;
-        
-        SQL_FetchString(hndl, 0, steamid, sizeof(steamid));
-        time = SQL_FetchFloat(hndl, 1);
-        style = SQL_FetchInt(hndl, 2);
-        
-        PrintToChat(client, "#%d: %s - %.2f (Style: %d)", rank++, steamid, time, style);
-    }
-}
-
-public void OnClientPutInServer(int client) {
-    ResetPlayerTimer(client);
-}
-
-public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast) {
-    int client = GetClientOfUserId(event.GetInt("userid"));
-    
-    if (IsValidClient(client)) {
-        ResetPlayerTimer(client);
-    }
-    
-    return Plugin_Continue;
-}
-
-public Action Event_RoundStart(Event event, const char[] name, bool dontBroadcast) {
-    // Reset all player timers at round start
-    for (int i = 1; i <= MaxClients; i++) {
-        if (IsValidClient(i)) {
-            ResetPlayerTimer(i);
+public int MenuHandler_Timer(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[32];
+            menu.GetItem(param2, info, sizeof(info));
+            
+            if (StrEqual(info, "start"))
+            {
+                StartTimer(param1);
+            }
+            else if (StrEqual(info, "stop"))
+            {
+                StopTimer(param1);
+            }
+            else if (StrEqual(info, "restart"))
+            {
+                RestartTimer(param1);
+            }
+        }
+        case MenuAction_End:
+        {
+            delete menu;
         }
     }
-    
-    return Plugin_Continue;
-}
-
-// Utility Functions
-bool IsValidClient(int client) {
-    return (client > 0 && client <= MaxClients && IsClientConnected(client) && IsClientInGame(client) && !IsFakeClient(client));
-}
-
-// Zone Detection and Timer Logic
-public void OnGameFrame() {
-    for (int client = 1; client <= MaxClients; client++) {
-        if (!IsValidClient(client)) continue;
-        
-        // Check player's current zone
-        int currentZone = GetPlayerZone(client);
-        
-        if (currentZone != g_PlayerTimers[client].CurrentZone) {
-            HandleZoneTransition(client, g_PlayerTimers[client].CurrentZone, currentZone);
-        }
-        
-        // Update timer if running
-        if (g_PlayerTimers[client].IsRunning) {
-            g_PlayerTimers[client].CurrentTime += GetTickInterval();
-        }
-    }
-}
-
-int GetPlayerZone(int client) {
-    // Placeholder for zone detection logic
-    // Would typically use a zone system that checks player position against predefined zones
     return 0;
 }
 
-void HandleZoneTransition(int client, int oldZone, int newZone) {
-    // Handle different zone transitions
-    switch (newZone) {
-        case ZONE_START: {
-            // Reset timer when entering start zone
-            ResetPlayerTimer(client);
-            g_PlayerTimers[client].IsRunning = true;
-        }
-        case ZONE_END: {
-            // Complete run, save time
-            CompleteRun(client);
-        }
-        case ZONE_CHECKPOINT: {
-            // Save checkpoint
-            g_PlayerTimers[client].Checkpoints[newZone] = GetTime();
-        }
+void ShowCheckpointMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_Checkpoint);
+    menu.SetTitle("Checkpoint Menu");
+    
+    char buffer[64];
+    for (int i = 0; i < g_iCurrentCheckpoint[client]; i++)
+    {
+        Format(buffer, sizeof(buffer), "Checkpoint %d", i + 1);
+        menu.AddItem("", buffer, ITEMDRAW_DISABLED);
     }
     
-    g_PlayerTimers[client].CurrentZone = newZone;
+    menu.ExitButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
 }
 
-void CompleteRun(int client) {
-    float runTime = g_PlayerTimers[client].CurrentTime;
+public int MenuHandler_Checkpoint(Menu menu, MenuAction action, int param1, int param2)
+{
+    if (action == MenuAction_End)
+    {
+        delete menu;
+    }
+    return 0;
+}
+
+void ShowZoneMenu(int client)
+{
+    Menu menu = new Menu(MenuHandler_Zone);
+    menu.SetTitle("Zone Menu");
     
-    // Check if this is a personal best
-    if (runTime < g_PlayerTimers[client].BestTime || g_PlayerTimers[client].BestTime == 0.0) {
-        g_PlayerTimers[client].BestTime = runTime;
+    menu.AddItem("start", "Add Start Zone");
+    menu.AddItem("end", "Add End Zone");
+    menu.AddItem("checkpoint", "Add Checkpoint");
+    menu.AddItem("bonus_start", "Add Bonus Start");
+    menu.AddItem("bonus_end", "Add Bonus End");
+    menu.AddItem("delete", "Delete Zone");
+    
+    menu.ExitButton = true;
+    menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_Zone(Menu menu, MenuAction action, int param1, int param2)
+{
+    switch (action)
+    {
+        case MenuAction_Select:
+        {
+            char info[32];
+            menu.GetItem(param2, info, sizeof(info));
+            
+            if (StrEqual(info, "start"))
+            {
+                CreateZone(param1, ZONE_START);
+            }
+            else if (StrEqual(info, "end"))
+            {
+                CreateZone(param1, ZONE_END);
+            }
+            else if (StrEqual(info, "checkpoint"))
+            {
+                CreateZone(param1, ZONE_CHECKPOINT);
+            }
+            else if (StrEqual(info, "bonus_start"))
+            {
+                CreateZone(param1, ZONE_BONUS_START);
+            }
+            else if (StrEqual(info, "bonus_end"))
+            {
+                CreateZone(param1, ZONE_BONUS_END);
+            }
+            else if (StrEqual(info, "delete"))
+            {
+                ShowDeleteZoneMenu(param1);
+            }
+        }
+        case MenuAction_End:
+        {
+            delete menu;
+        }
+    }
+    return 0;
+}
+
+void CreateZone(int client, int type)
+{
+    ZoneType zone;
+    zone.type = type;
+    zone.active = true;
+    
+    // Get player position for initial zone point
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    
+    // Set initial points (create a cube around player position)
+    for (int i = 0; i < 8; i++)
+    {
+        zone.points[i] = pos;
+        zone.points[i][0] += (i & 1) ? 50.0 : -50.0;
+        zone.points[i][1] += (i & 2) ? 50.0 : -50.0;
+        zone.points[i][2] += (i & 4) ? 100.0 : 0.0;
+    }
+    
+    // Create zone entity
+    zone.entity = CreateZoneEntity(zone);
+    
+    // Add to zones array
+    g_MapZones.PushArray(zone);
+    
+    // Save zones to config
+    SaveZones();
+}
+
+int CreateZoneEntity(ZoneType zone)
+{
+    int entity = CreateEntityByName("trigger_multiple");
+    if (entity == -1)
+        return -1;
+    
+    DispatchKeyValue(entity, "spawnflags", "1");
+    DispatchSpawn(entity);
+    
+    // Set entity position and size
+    float mins[3], maxs[3];
+    GetZoneMinsMaxs(zone, mins, maxs);
+    
+    float origin[3];
+    for (int i = 0; i < 3; i++)
+        origin[i] = (mins[i] + maxs[i]) / 2.0;
+    
+    TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
+    
+    // Set trigger size
+    float size[3];
+    for (int i = 0; i < 3; i++)
+        size[i] = (maxs[i] - mins[i]) / 2.0;
+    
+    SetEntPropVector(entity, Prop_Send, "m_vecMins", size);
+    SetEntPropVector(entity, Prop_Send, "m_vecMaxs", size);
+    
+    return entity;
+}
+
+void GetZoneMinsMaxs(ZoneType zone, float mins[3], float maxs[3])
+{
+    // Initialize with first point
+    mins = zone.points[0];
+    maxs = zone.points[0];
+    
+    // Find min and max values
+    for (int i = 1; i < 8; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            if (zone.points[i][j] < mins[j])
+                mins[j] = zone.points[i][j];
+            if (zone.points[i][j] > maxs[j])
+                maxs[j] = zone.points[i][j];
+        }
+    }
+}
+
+void LoadZones()
+{
+    // Implementation for loading zones from config file
+    // This would read from a config file and populate g_MapZones
+}
+
+void SaveZones()
+{
+    // Implementation for saving zones to config file
+    // This would write the current g_MapZones to a config file
+}
+
+public Action Timer_CheckZones(Handle timer)
+{
+    for (int client = 1; client <= MaxClients; client++)
+    {
+        if (IsClientInGame(client) && !IsFakeClient(client))
+        {
+            CheckPlayerZone(client);
+        }
+    }
+    return Plugin_Continue;
+}
+
+void CheckPlayerZone(int client)
+{
+    float pos[3];
+    GetClientAbsOrigin(client, pos);
+    
+    for (int i = 0; i < g_MapZones.Length; i++)
+    {
+        ZoneType zone;
+        g_MapZones.GetArray(i, zone);
         
-        // Save to database
-        SaveRunToDatabase(client, runTime);
+        if (!zone.active)
+            continue;
         
-        PrintToChat(client, "\x04[Surf Timer]\x01 New Personal Best: %.2f", runTime);
+        if (IsPointInZone(pos, zone))
+        {
+            HandleZoneEnter(client, zone);
+        }
     }
-    
-    // Stop the timer
-    g_PlayerTimers[client].IsRunning = false;
 }
 
-void SaveRunToDatabase(int client, float time) {
-    if (g_Database == null) return;
+bool IsPointInZone(float point[3], ZoneType zone)
+{
+    float mins[3], maxs[3];
+    GetZoneMinsMaxs(zone, mins, maxs);
     
-    char steamid[32];
-    GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
-    
-    char query[512];
-    Format(query, sizeof(query), 
-        "INSERT INTO surf_times (steamid, map, style, time) " ...
-        "VALUES ('%s', '%s', %d, %f) " ...
-        "ON DUPLICATE KEY UPDATE time = LEAST(time, %f)",
-        steamid, g_sCurrentMap, 0, time, time);
-    
-    SQL_TQuery(g_Database, SaveRunCallback, query);
+    return (point[0] >= mins[0] && point[0] <= maxs[0] &&
+            point[1] >= mins[1] && point[1] <= maxs[1] &&
+            point[2] >= mins[2] && point[2] <= maxs[2]);
 }
 
-public void SaveRunCallback(Handle owner, Handle hndl, const char[] error, any data) {
-    if (hndl == INVALID_HANDLE) {
-        LogError("Save Run Error: %s", error);
+void HandleZoneEnter(int client, ZoneType zone)
+{
+    switch (zone.type)
+    {
+        case ZONE_START:
+        {
+            StartTimer(client);
+        }
+        case ZONE_END:
+        {
+            FinishTimer(client);
+        }
+        case ZONE_CHECKPOINT:
+        {
+            HandleCheckpoint(client);
+        }
+        case ZONE_BONUS_START:
+        {
+            StartBonusTimer(client);
+        }
+        case ZONE_BONUS_END:
+        {
+            FinishBonusTimer(client);
+        }
     }
+}
+
+void StartTimer(int client)
+{
+    g_bTimerRunning[client] = true;
+    g_fStartTime[client] = GetGameTime();
+    g_iCurrentCheckpoint[client] = 0;
+    PrintToChat(client, " \x04[Timer]\x01 Timer started!");
+}
+
+void StopTimer(int client)
+{
+    g_bTimerRunning[client] = false;
+    PrintToChat(client, " \x04[Timer]\x01 Timer stopped!");
+}
+
+void RestartTimer(int client)
+{
+    StartTimer(client);
+}
+
+void FinishTimer(int client)
+{
+    if (!g_bTimerRunning[client])
+        return;
+    
+    float time = GetGameTime() - g_fStartTime[client];
+    g_fCurrentTime[client] = time;
+    g_bTimerRunning[client] = false;
+    
+    char timeStr[32];
+    FormatTime(time, timeStr, sizeof(timeStr));
+    PrintToChat(client, " \x04[Timer]\x01 Finished in %s!", timeStr);
+}
+
+void HandleCheckpoint(int client)
+{
+    if (!g_bTimerRunning[client])
+        return;
+    
+    g_iCurrentCheckpoint[client]++;
+    float time = GetGameTime() - g_fStartTime[client];
+    
+    char timeStr[32];
+    FormatTime(time, timeStr, sizeof(timeStr));
+    PrintToChat(client, " \x04[Timer]\x01 Checkpoint %d: %s", g_iCurrentCheckpoint[client], timeStr);
+}
+
+void StartBonusTimer(int client)
+{
+    StartTimer(client); // For now, treat bonus timer the same as regular timer
+}
+
+void FinishBonusTimer(int client)
+{
+    FinishTimer(client); // For now, treat bonus timer the same as regular timer
+}
+
+void ResetTimer(int client)
+{
+    g_bTimerRunning[client] = false;
+    g_fStartTime[client] = 0.0;
+    g_fCurrentTime[client] = 0.0;
+    g_iCurrentCheckpoint[client] = 0;
+}
+
+void FormatTime(float time, char[] buffer, int maxlen)
+{
+    int minutes = RoundToFloor(time / 60.0);
+    float seconds = time - float(minutes * 60);
+    Format(buffer, maxlen, "%d:%05.2f", minutes, seconds);
+}
+
+public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client > 0 && IsClientInGame(client) && !IsFakeClient(client))
+    {
+        ResetTimer(client);
+    }
+    return Plugin_Continue;
+}
+
+public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client > 0 && IsClientInGame(client) && !IsFakeClient(client))
+    {
+        StopTimer(client);
+    }
+    return Plugin_Continue;
 } 

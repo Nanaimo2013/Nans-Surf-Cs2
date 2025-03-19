@@ -3,6 +3,7 @@
 
 #include <sourcemod>
 #include <cstrike>
+#include <timer>
 
 #define MAX_REPLAY_FRAMES 10000
 #define MAX_REPLAY_TYPES 4
@@ -24,6 +25,36 @@ enum struct ReplayFrame {
 methodmap SurfReplaySystem {
     public SurfReplaySystem() {
         // Constructor
+    }
+    
+    public static bool StartReplay(int client, int type) {
+        if (!IsValidClient(client)) return false;
+        
+        char replayPath[PLATFORM_MAX_PATH];
+        Format(replayPath, sizeof(replayPath), 
+            "data/surftimer/replays/%s_%s_%d.replay", 
+            g_sCurrentMap, 
+            GetReplayTypeName(type), 
+            client);
+        
+        // Placeholder replay start logic
+        return true;
+    }
+
+    public static bool StopReplay(int client) {
+        if (!IsValidClient(client)) return false;
+        
+        // Placeholder replay stop logic
+        return true;
+    }
+
+    public static void ListReplays(int client, int type) {
+        if (!IsValidClient(client)) return;
+        
+        // Placeholder replay listing logic
+        char typeName[32];
+        GetReplayTypeName(type, typeName, sizeof(typeName));
+        PrintToChat(client, "Available %s replays:", typeName);
     }
     
     public void RecordReplay(int client, ReplayType type, int identifier = 0) {
@@ -51,18 +82,6 @@ methodmap SurfReplaySystem {
         // Store replay file handle for ongoing recording
     }
     
-    public void StopReplay(int client, ReplayType type, int identifier = 0) {
-        // Stop recording and save replay
-        char replayPath[PLATFORM_MAX_PATH];
-        Format(replayPath, sizeof(replayPath), 
-            "data/surftimer/replays/%s_%s_%d.replay", 
-            g_sCurrentMap, 
-            GetReplayTypeName(type), 
-            identifier);
-        
-        // Close file and finalize recording
-    }
-    
     public void PlayReplay(int client, ReplayType type, int identifier = 0) {
         // Load and play a specific replay
         char replayPath[PLATFORM_MAX_PATH];
@@ -86,34 +105,6 @@ methodmap SurfReplaySystem {
         }
         
         // Read replay metadata and frames
-    }
-    
-    public void ListReplays(int client, ReplayType type) {
-        Menu menu = new Menu(MenuHandler_ReplayList);
-        menu.SetTitle("Surf Replays - %s\n \n", GetReplayTypeName(type));
-        
-        // Scan replay directory and list available replays
-        char replayDir[PLATFORM_MAX_PATH];
-        Format(replayDir, sizeof(replayDir), "data/surftimer/replays/");
-        
-        DirectoryListing dir = OpenDirectory(replayDir);
-        if (dir == null) {
-            CPrintToChat(client, " {red}[Surf] {default}Failed to open replay directory.");
-            return;
-        }
-        
-        char replayFile[PLATFORM_MAX_PATH];
-        FileType fileType;
-        
-        while (ReadDirEntry(dir, replayFile, sizeof(replayFile), fileType)) {
-            if (fileType == FileType_File && StrContains(replayFile, GetReplayTypeName(type)) != -1) {
-                menu.AddItem(replayFile, replayFile);
-            }
-        }
-        
-        menu.Display(client, MENU_TIME_FOREVER);
-        
-        delete dir;
     }
     
     public char[] GetReplayTypeName(ReplayType type) {

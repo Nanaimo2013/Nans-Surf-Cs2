@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # GitHub Repository
-GITHUB_REPO="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/scripts"
+GITHUB_REPO="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main"
 
 # Logging function
 log_message() {
@@ -26,9 +26,8 @@ download_file() {
     
     log_message "Downloading: $url"
     
-    # Increase timeout and add verbose error reporting
     if ! curl -sSL --fail --max-time 60 --retry 3 "$url" -o "$target"; then
-        handle_error "Failed to download $url. Check network connection and URL."
+        handle_error "Failed to download $url"
     fi
     
     chmod +x "$target"
@@ -40,80 +39,79 @@ perform_first_time_install() {
     if [ ! -f "/home/container/.surf_installation_complete" ]; then
         log_message "Performing first-time installation..."
         
-        # Ensure scripts directory exists
-        mkdir -p /home/container/scripts
+        # Create necessary directories
+        mkdir -p /home/container/game/csgo/cfg
+        mkdir -p /home/container/game/csgo/addons/sourcemod/configs/surf
         
-        # Download installation script
-        if ! curl -sSL "https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/scripts/install_surf.sh" -o "/home/container/scripts/install_surf.sh"; then
-            handle_error "Failed to download installation script"
-        fi
+        # Download configurations
+        download_file "$GITHUB_REPO/cfg/server.cfg" "/home/container/game/csgo/cfg/server.cfg"
+        download_file "$GITHUB_REPO/cfg/workshop_maps.cfg" "/home/container/game/csgo/cfg/workshop_maps.cfg"
         
-        # Make script executable
-        chmod +x /home/container/scripts/install_surf.sh
+        # Download SourceMod plugins
+        mkdir -p /home/container/game/csgo/addons/sourcemod/plugins
+        download_file "$GITHUB_REPO/plugins/nans_surf.smx" "/home/container/game/csgo/addons/sourcemod/plugins/nans_surf.smx"
+        download_file "$GITHUB_REPO/plugins/nans_surftimer.smx" "/home/container/game/csgo/addons/sourcemod/plugins/nans_surftimer.smx"
         
-        # Run the installation script
-        if ! bash /home/container/scripts/install_surf.sh; then
-            handle_error "Installation script failed"
-        fi
+        # Download timer components
+        mkdir -p /home/container/game/csgo/addons/sourcemod/plugins/nans_surftimer
+        for component in zones database player_manager map_manager leaderboard replay_system; do
+            download_file "$GITHUB_REPO/plugins/nans_surftimer/${component}.sp" "/home/container/game/csgo/addons/sourcemod/plugins/nans_surftimer/${component}.sp"
+        done
+        
+        # Mark installation as complete
+        touch /home/container/.surf_installation_complete
+        log_message "Installation completed successfully"
     else
-        log_message "Surf server already installed. Skipping installation."
+        log_message "Surf server already installed"
     fi
 }
 
 # Validate required environment variables
 validate_env_vars() {
-    # Steam Account Token
     if [ -z "${STEAM_ACCOUNT:-}" ]; then
-        log_message "ERROR: Steam Account Token is REQUIRED. Server cannot start without it."
-        log_message "Please set the STEAM_ACCOUNT environment variable in your Pterodactyl panel."
-        log_message "You can obtain a token from: https://steamcommunity.com/dev/managegameservers"
+        log_message "ERROR: Steam Game Server Login Token is REQUIRED"
+        log_message "Please set the STEAM_ACCOUNT environment variable in your Pterodactyl panel"
+        log_message "Get a token from: https://steamcommunity.com/dev/managegameservers"
         exit 1
     fi
 
-    # Server Port
     if [ -z "${SERVER_PORT:-}" ]; then
         handle_error "SERVER_PORT environment variable is not set"
     fi
 }
 
-# Prepare server startup parameters
-prepare_startup_params() {
-    # Default map and settings
-    STARTUP_MAP="${SRCDS_MAP:-surf_beginner}"
-    MAX_PLAYERS="${SRCDS_MAXPLAYERS:-64}"
-
-    # Prepare custom arguments
-    CUSTOM_ARGS="${CUSTOM_STARTUP_ARGS:-}"
-
-    # Log server details
-    log_message "Starting CS2 Surf Server..."
-    log_message "Map: $STARTUP_MAP"
-    log_message "Max Players: $MAX_PLAYERS"
-    log_message "Custom Args: $CUSTOM_ARGS"
+# Update server.cfg with Steam token
+update_server_cfg() {
+    local cfg_file="/home/container/game/csgo/cfg/server.cfg"
+    if [ -f "$cfg_file" ]; then
+        sed -i "s/sv_setsteamaccount .*/sv_setsteamaccount \"${STEAM_ACCOUNT}\"/" "$cfg_file"
+    fi
 }
 
 # Main startup routine
 main() {
-    # Validate environment
     validate_env_vars
-
-    # Perform first-time installation if needed
     perform_first_time_install
+    update_server_cfg
 
-    # Prepare startup parameters
-    prepare_startup_params
+    # Start CS2 server
+    cd /home/container/game || exit 1
+    
+    # Build startup command
+    STARTUP_CMD="./cs2 -dedicated \
+        -console \
+        -usercon \
+        -port ${SERVER_PORT} \
+        -maxplayers ${MAXPLAYERS:-24} \
+        +map ${SRCDS_MAP:-surf_beginner} \
+        +sv_setsteamaccount ${STEAM_ACCOUNT} \
+        +exec server.cfg \
+        +exec workshop_maps.cfg \
+        ${ADDITIONAL_ARGS:-}"
 
-    # Start server with comprehensive arguments
-    cd /home/container/game/csgo
-    /home/container/game/cs2.sh -dedicated \
-        +ip 0.0.0.0 \
-        -port "${SERVER_PORT}" \
-        +map "$STARTUP_MAP" \
-        -maxplayers "$MAX_PLAYERS" \
-        +sv_setsteamaccount "${STEAM_ACCOUNT}" \
-        +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/server.cfg" \
-        +exec "/home/container/game/csgo/addons/sourcemod/configs/surf/workshop_maps.cfg" \
-        ${CUSTOM_ARGS}
+    # Execute the server
+    log_message "Starting CS2 Surf Server..."
+    eval "$STARTUP_CMD"
 }
 
 # Execute main routine
