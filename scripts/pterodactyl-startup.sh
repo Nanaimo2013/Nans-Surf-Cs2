@@ -101,14 +101,15 @@ main() {
     prepare_startup_params
 
     # Start server with comprehensive arguments
+    cd /home/container/game/csgo
     /home/container/game/cs2.sh -dedicated \
         +ip 0.0.0.0 \
         -port "${SERVER_PORT}" \
         +map "$STARTUP_MAP" \
         -maxplayers "$MAX_PLAYERS" \
         +sv_setsteamaccount "${STEAM_ACCOUNT:-}" \
-        +exec server.cfg \
-        +exec workshop_maps.cfg \
+        +exec "/home/container/game/csgo/cfg/server.cfg" \
+        +exec "/home/container/game/csgo/cfg/workshop_maps.cfg" \
         ${CUSTOM_STARTUP_ARGS}
 }
 
