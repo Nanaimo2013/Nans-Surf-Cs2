@@ -68,6 +68,71 @@ if [ ! -z ${DOWNLOAD_WORKSHOP_MAPS} ] && [ ${DOWNLOAD_WORKSHOP_MAPS} -eq 1 ]; th
     ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053732456 +quit
 fi
 
+# Create a default server.cfg if it doesn't exist
+if [ ! -f "/home/container/game/csgo/cfg/server.cfg" ]; then
+    mkdir -p /home/container/game/csgo/cfg
+    cat > /home/container/game/csgo/cfg/server.cfg << 'EOL'
+// Server Settings
+hostname "Nans Surf Server"
+sv_lan 0
+sv_setsteamaccount 7912CB397FC178ACF5E752CA6B4D75A3
+sv_tags "surf,timer,bhop"
+
+// Workshop Settings
+host_workshop_collection 0
+sv_workshop_allow_other_maps 1
+
+// Network Settings
+net_maxrate 786432
+sv_minrate 128000
+sv_maxrate 786432
+sv_minupdaterate 128
+sv_maxupdaterate 128
+sv_mincmdrate 128
+sv_maxcmdrate 128
+sv_client_min_interp_ratio 1
+sv_client_max_interp_ratio 1
+
+// Game Settings
+mp_autoteambalance 0
+mp_limitteams 0
+mp_autokick 0
+mp_freezetime 0
+mp_friendlyfire 0
+mp_ignore_round_win_conditions 1
+mp_match_end_restart 1
+mp_roundtime 60
+mp_timelimit 0
+mp_warmuptime 0
+
+// Movement Settings
+sv_accelerate 10
+sv_airaccelerate 150
+sv_friction 4
+sv_gravity 800
+sv_maxspeed 320
+sv_maxvelocity 3500
+sv_wateraccelerate 10
+sv_enablebunnyhopping 1
+sv_autobunnyhopping 1
+sv_staminamax 0
+sv_staminajumpcost 0
+sv_staminalandcost 0
+
+// Surf-specific Settings
+sv_infinite_ammo 2
+sv_alltalk 1
+sv_deadtalk 1
+sv_allow_votes 0
+sv_cheats 0
+sv_pure 0
+sv_pure_kick_clients 0
+sv_pure_trace 0
+sv_competitive_minspec 0
+EOL
+    echo "Created default server.cfg file"
+fi
+
 # Edit gameinfo.gi to add MetaMod path
 GAMEINFO_FILE="/home/container/game/csgo/gameinfo.gi"
 GAMEINFO_ENTRY="            Game    csgo/addons/metamod"
@@ -103,6 +168,38 @@ EOL
     chmod +x /home/container/game/cs2.sh
 fi
 
+# Create an install_surf.sh script for installing/updating plugins
+cat > /home/container/install_surf.sh << 'EOL'
+#!/bin/bash
+cd /home/container
+
+# Create necessary directories
+mkdir -p game/csgo/addons/metamod
+mkdir -p game/csgo/addons/sourcemod
+mkdir -p game/csgo/addons/sourcemod/plugins
+mkdir -p game/csgo/addons/sourcemod/configs
+mkdir -p game/csgo/addons/sourcemod/scripting
+
+# Download and install metamod if needed
+if [ ! -f "game/csgo/addons/metamod/metaplugins.ini" ]; then
+    echo "Installing Metamod..."
+    curl -sqL "https://mms.alliedmods.net/mmsdrop/2.0/mmsource-2.0.0-git1333-linux.tar.gz" | tar zxvf - -C game/csgo
+fi
+
+# Download and install sourcemod if needed
+if [ ! -f "game/csgo/addons/sourcemod/sourcemod.conf" ]; then
+    echo "Installing SourceMod..."
+    curl -sqL "https://sm.alliedmods.net/smdrop/1.12/sourcemod-1.12.0-git6950-linux.tar.gz" | tar zxvf - -C game/csgo
+fi
+
+echo "Done! Surf server components installed."
+EOL
+chmod +x /home/container/install_surf.sh
+
+# Running the surf installation script
+echo "Installing surf components..."
+/bin/bash /home/container/install_surf.sh
+
 # Replace Startup Variables
 MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
 echo ":/home/container$ ${MODIFIED_STARTUP}"
@@ -110,11 +207,35 @@ echo ":/home/container$ ${MODIFIED_STARTUP}"
 # Create a special environment for running CS2
 export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
 
-# Run the Server with modified startup if needed
+# Add arguments to ensure network connectivity
 if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     # Replace cs2.sh with cs2_wrapper.sh in the startup command
     MODIFIED_STARTUP=${MODIFIED_STARTUP/cs2.sh/cs2_wrapper.sh}
+    
+    # Add extra network parameters if not already present
+    if [[ ${MODIFIED_STARTUP} != *"+ip 0.0.0.0"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +ip 0.0.0.0"
+    fi
+    
+    if [[ ${MODIFIED_STARTUP} != *"+net_public_adr"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +net_public_adr ${EXTERNAL_IP:-$INTERNAL_IP}"
+    fi
+    
+    if [[ ${MODIFIED_STARTUP} != *"+clientport"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +clientport 27005"
+    fi
+    
+    if [[ ${MODIFIED_STARTUP} != *"+tv_port"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +tv_port 27020"
+    fi
+    
+    # Add sv_lan 0 to ensure internet connections
+    if [[ ${MODIFIED_STARTUP} != *"+sv_lan"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +sv_lan 0"
+    fi
 fi
+
+echo "Final startup command: ${MODIFIED_STARTUP}"
 
 # Run the Server
 eval ${MODIFIED_STARTUP} 

@@ -20,7 +20,11 @@ RUN         apt update && \
             libnm0 \
             ca-certificates \
             locales \
-            tzdata && \
+            tzdata \
+            net-tools \
+            iputils-ping \
+            netcat \
+            iptables && \
             apt-get clean
 
 # Set up locales
