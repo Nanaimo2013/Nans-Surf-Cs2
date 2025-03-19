@@ -31,6 +31,6 @@ jobs:
           file: docker/RT3-Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/nans-surf-cs2:latest
+            ghcr.io/nanaimo2013/nans-surf-cs2:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max 
