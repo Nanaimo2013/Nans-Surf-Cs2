@@ -9,6 +9,7 @@ mkdir -p /home/container/game/csgo/maps/workshop
 mkdir -p /home/container/cfg
 mkdir -p /home/container/.steam/sdk32
 mkdir -p /home/container/.steam/sdk64
+mkdir -p /home/container/game/bin/linuxsteamrt64
 
 # Download and extract SteamCMD if not present
 if [ ! -f "/home/container/steamcmd/steamcmd.sh" ]; then
@@ -40,6 +41,15 @@ if [ ! -z ${SRCDS_APPID} ]; then
         # Create symlinks for steamclient.so
         mkdir -p /home/container/game/bin/linuxsteamrt64
         ln -sf /home/container/.steam/sdk64/steamclient.so /home/container/game/bin/linuxsteamrt64/steamclient.so
+        
+        # Handle libserver_valve.so - create empty file if it doesn't exist
+        if [ ! -f "/home/container/game/bin/linuxsteamrt64/libserver_valve.so" ]; then
+            echo "Creating placeholder for libserver_valve.so"
+            touch /home/container/game/bin/linuxsteamrt64/libserver_valve.so
+        fi
+        
+        # Set LD_LIBRARY_PATH
+        export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
     fi
 fi
 
@@ -80,9 +90,31 @@ if [ -f "${GAMEINFO_FILE}" ]; then
     fi
 fi
 
+# Create a wrapper script for cs2.sh that preloads required libraries
+if [ -f "/home/container/game/cs2.sh" ]; then
+    cat > /home/container/game/cs2_wrapper.sh << 'EOL'
+#!/bin/bash
+export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
+cd /home/container/game
+exec ./cs2.sh "$@"
+EOL
+    chmod +x /home/container/game/cs2_wrapper.sh
+    # Allow direct execution of cs2.sh without wrapper if needed
+    chmod +x /home/container/game/cs2.sh
+fi
+
 # Replace Startup Variables
 MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
 echo ":/home/container$ ${MODIFIED_STARTUP}"
+
+# Create a special environment for running CS2
+export LD_LIBRARY_PATH=/home/container/game/bin/linuxsteamrt64:/home/container/.steam/sdk64:$LD_LIBRARY_PATH
+
+# Run the Server with modified startup if needed
+if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
+    # Replace cs2.sh with cs2_wrapper.sh in the startup command
+    MODIFIED_STARTUP=${MODIFIED_STARTUP/cs2.sh/cs2_wrapper.sh}
+fi
 
 # Run the Server
 eval ${MODIFIED_STARTUP} 

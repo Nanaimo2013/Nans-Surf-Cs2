@@ -14,8 +14,20 @@ RUN         apt update && \
             lib32gcc1 \
             lib32stdc++6 \
             lib32ncurses6 \
-            libcurl4-openssl-dev && \
+            libcurl4-openssl-dev \
+            libssl-dev \
+            libsdl2-2.0-0 \
+            libnm0 \
+            ca-certificates \
+            locales \
+            tzdata && \
             apt-get clean
+
+# Set up locales
+RUN         locale-gen en_US.UTF-8
+ENV         LANG=en_US.UTF-8 \
+            LANGUAGE=en_US:en \
+            LC_ALL=en_US.UTF-8
 
 # Create container user
 RUN         useradd -m -d /home/container -s /bin/bash container && \
