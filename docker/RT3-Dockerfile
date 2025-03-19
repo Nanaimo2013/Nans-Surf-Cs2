@@ -51,9 +51,6 @@ RUN         useradd -m -d /home/container -s /bin/bash container && \
             mkdir -p /home/container/.steam/sdk64 && \
             mkdir -p /home/container/game/csgo/addons && \
             mkdir -p /home/container/game/csgo/cfg/sourcemod && \
-            mkdir -p /home/container/game/csgo/materials && \
-            mkdir -p /home/container/game/csgo/models && \
-            mkdir -p /home/container/game/csgo/sound && \
             mkdir -p /home/container/game/csgo/addons/sourcemod/plugins && \
             mkdir -p /home/container/game/csgo/addons/sourcemod/data && \
             mkdir -p /home/container/game/csgo/addons/sourcemod/configs && \
