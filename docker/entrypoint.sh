@@ -269,97 +269,98 @@ if [ -d "/home/container/configs" ]; then
     cp -rf /home/container/configs/* /home/container/game/csgo/cfg/
 fi
 
-# Set up SourceMod compiler and compile plugins
-echo "Setting up SourceMod compiler..."
-mkdir -p /home/container/addons/sourcemod/scripting
-cd /home/container/addons/sourcemod/scripting
+# Handle plugins
+echo "Setting up plugins..."
+if [ ${COMPILE_PLUGINS:-0} -eq 1 ] && [ -d "/home/container/gamefiles/plugins/source" ]; then
+    # Set up SourceMod compiler and compile plugins
+    echo "Setting up SourceMod compiler..."
+    mkdir -p /home/container/addons/sourcemod/scripting
+    cd /home/container/addons/sourcemod/scripting
 
-# Download latest SourceMod compiler
-curl -sqL "https://sm.alliedmods.net/smdrop/1.12/sourcemod-1.12.0-git7195-linux.tar.gz" | tar xzf - scripting/
-chmod +x spcomp
+    # Download latest SourceMod compiler
+    curl -sqL "https://sm.alliedmods.net/smdrop/1.12/sourcemod-1.12.0-git7195-linux.tar.gz" | tar xzf - scripting/
+    chmod +x spcomp
 
-# Compile all plugins in the plugins directory
-echo "Compiling plugins..."
-mkdir -p /home/container/game/csgo/addons/sourcemod/plugins
-if [ -d "/home/container/plugins" ]; then
-    for plugin in /home/container/plugins/*.sp; do
+    # Compile all plugins in the source directory
+    echo "Compiling plugins..."
+    for plugin in /home/container/gamefiles/plugins/source/*.sp; do
         if [ -f "$plugin" ]; then
             echo "Compiling ${plugin}..."
             cp "$plugin" .
             ./spcomp $(basename "$plugin") -i"include" -o"/home/container/game/csgo/addons/sourcemod/plugins/$(basename "${plugin%.sp}").smx"
         fi
     done
+else
+    echo "Using pre-compiled plugins..."
 fi
 
-# Create directories for custom content
-mkdir -p /home/container/game/csgo/materials
-mkdir -p /home/container/game/csgo/models
-mkdir -p /home/container/game/csgo/sound
+# Ensure proper permissions for plugins
+chmod -R 755 /home/container/game/csgo/addons/sourcemod/plugins
 
-# Copy custom content if it exists
-if [ -d "/home/container/materials" ]; then
-    cp -rf /home/container/materials/* /home/container/game/csgo/materials/
-fi
+# Create merged server configuration
+echo "Creating merged server configuration..."
+cat > /home/container/game/csgo/cfg/server.cfg << 'EOL'
+// Load core CS2 configuration
+exec sourcemod/cs2.cfg
 
-if [ -d "/home/container/models" ]; then
-    cp -rf /home/container/models/* /home/container/game/csgo/models/
-fi
+// Load surf-specific configuration
+exec sourcemod/surf.cfg
 
-if [ -d "/home/container/sound" ]; then
-    cp -rf /home/container/sound/* /home/container/game/csgo/sound/
-fi
+// Server identity
+hostname "Nans Surf Server"
+sv_tags "surf,timer,bhop"
 
-# Create data directory for plugin data
-mkdir -p /home/container/game/csgo/addons/sourcemod/data
+// Workshop configuration
+host_workshop_collection 2124557811
+sv_workshop_allow_other_maps 1
 
-# Copy plugin data if it exists
-if [ -d "/home/container/data" ]; then
-    cp -rf /home/container/data/* /home/container/game/csgo/addons/sourcemod/data/
-fi
+// Network optimization
+net_maxrate 786432
+sv_minrate 128000
+sv_maxrate 786432
+sv_minupdaterate 128
+sv_maxupdaterate 128
+sv_mincmdrate 128
+sv_maxcmdrate 128
 
-# Set proper permissions
-chmod -R 755 /home/container/game/csgo/addons
-chmod -R 755 /home/container/game/csgo/cfg
-chmod -R 755 /home/container/game/csgo/maps
+// Game settings
+mp_autoteambalance 0
+mp_limitteams 0
+mp_autokick 0
+mp_freezetime 0
+mp_friendlyfire 0
+mp_ignore_round_win_conditions 1
+mp_match_end_restart 1
+mp_roundtime 60
+mp_timelimit 0
+mp_warmuptime 0
 
-# Create directories for logs
-mkdir -p /home/container/game/csgo/logs
-mkdir -p /home/container/game/csgo/addons/sourcemod/logs
+// Movement settings
+sv_accelerate 10
+sv_airaccelerate 150
+sv_friction 4
+sv_gravity 800
+sv_maxspeed 320
+sv_maxvelocity 3500
+sv_wateraccelerate 10
+sv_enablebunnyhopping 1
+sv_autobunnyhopping 1
+sv_staminamax 0
+sv_staminajumpcost 0
+sv_staminalandcost 0
 
-# Add CS2-specific configurations
-echo "Configuring CS2-specific settings..."
-cat > /home/container/game/csgo/cfg/sourcemod/cs2.cfg << 'EOL'
-// CS2-specific configurations
+// Server settings
+sv_infinite_ammo 2
+sv_alltalk 1
+sv_deadtalk 1
+sv_allow_votes 0
 sv_cheats 0
-sv_lan 0
 sv_pure 0
 sv_pure_kick_clients 0
-sv_allow_wait_command 0
-sv_hibernate_when_empty 0
-sv_hibernate_postgame_delay 0
-sv_hibernate_after_game_end 0
-sv_parallel_packentities 1
-sv_parallel_sendsnapshot 1
 sv_steamauth_enforce 0
-sv_steamgroup_exclusive 0
-
-// Network settings optimized for CS2
-net_maxcleartime 0.001
-net_splitrate 1
-net_splitpacket_maxrate 786432
-net_maxroutable 1260
-net_queued_packet_thread 1
-net_client_steamdatagram_enable_override 1
-
-// Performance settings
-fps_max 0
-host_thread_mode 1
-host_workers 4
-mat_queue_mode 2
-r_dynamic 0
 EOL
 
-# Add additional CS2 startup parameters
+# Add CS2-specific startup parameters
 if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     # Add CS2-specific parameters
     [[ ${MODIFIED_STARTUP} != *"-dedicated"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} -dedicated"
@@ -368,5 +369,5 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     [[ ${MODIFIED_STARTUP} != *"+fps_max"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} +fps_max 300"
     [[ ${MODIFIED_STARTUP} != *"+host_thread_mode"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} +host_thread_mode 1"
     [[ ${MODIFIED_STARTUP} != *"+host_workers"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} +host_workers 4"
-    [[ ${MODIFIED_STARTUP} != *"+exec cs2.cfg"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} +exec sourcemod/cs2.cfg"
+    [[ ${MODIFIED_STARTUP} != *"+exec"* ]] && MODIFIED_STARTUP="${MODIFIED_STARTUP} +exec server.cfg"
 fi 

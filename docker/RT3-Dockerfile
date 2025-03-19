@@ -51,7 +51,11 @@ RUN         useradd -m -d /home/container -s /bin/bash container && \
             mkdir -p /home/container/.steam/sdk64 && \
             mkdir -p /home/container/game/csgo/addons && \
             mkdir -p /home/container/game/csgo/cfg/sourcemod && \
-            mkdir -p /home/container/plugins && \
+            mkdir -p /home/container/game/csgo/materials && \
+            mkdir -p /home/container/game/csgo/models && \
+            mkdir -p /home/container/game/csgo/sound && \
+            mkdir -p /home/container/game/csgo/addons/sourcemod/plugins && \
+            mkdir -p /home/container/game/csgo/addons/sourcemod/data && \
             chown -R container:container /home/container
 
 # Switch to container user
@@ -59,9 +63,14 @@ USER        container
 ENV         USER=container HOME=/home/container
 WORKDIR     /home/container
 
-# Copy your custom files
-COPY        --chown=container:container ./plugins /home/container/plugins
-COPY        --chown=container:container ./configs /home/container/configs
+# Copy game files
+COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home/container/game/csgo/addons/sourcemod/plugins/
+COPY        --chown=container:container ./gamefiles/configs/core/* /home/container/game/csgo/cfg/
+COPY        --chown=container:container ./gamefiles/configs/sourcemod/* /home/container/game/csgo/cfg/sourcemod/
+COPY        --chown=container:container ./gamefiles/materials /home/container/game/csgo/materials/
+COPY        --chown=container:container ./gamefiles/models /home/container/game/csgo/models/
+COPY        --chown=container:container ./gamefiles/sound /home/container/game/csgo/sound/
+COPY        --chown=container:container ./gamefiles/data /home/container/game/csgo/addons/sourcemod/data/
 COPY        --chown=container:container ./docker/entrypoint.sh /entrypoint.sh
 
 # Make scripts executable
@@ -73,6 +82,7 @@ ENV         SRCDS_APPID=730 \
             SRCDS_MAXPLAYERS=24 \
             SRCDS_MAP="workshop/2124557811/surf_beginner" \
             SRCDS_VALIDATE=1 \
-            DOWNLOAD_WORKSHOP_MAPS=1
+            DOWNLOAD_WORKSHOP_MAPS=1 \
+            COMPILE_PLUGINS=0
 
 CMD         [ "/bin/bash", "/entrypoint.sh" ]
