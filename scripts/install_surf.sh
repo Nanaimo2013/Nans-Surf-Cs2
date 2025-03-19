@@ -131,6 +131,26 @@ compile_plugins() {
     cd "$BASE_DIR"
 }
 
+# Fallback plugin download method
+fallback_plugin_download() {
+    log_message "Attempting fallback plugin download method..."
+    
+    # Define fallback plugin sources
+    declare -A FALLBACK_SOURCES=(
+        ["adminmenu"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/adminmenu.sp"
+        ["basecommands"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/basecommands.sp"
+        ["mapchooser"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/mapchooser.sp"
+        ["rockthevote"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/rockthevote.sp"
+    )
+
+    # Download each plugin source
+    for plugin_name in "${!FALLBACK_SOURCES[@]}"; do
+        if ! download_file "${FALLBACK_SOURCES[$plugin_name]}" "$SCRIPTING_DIR/${plugin_name}.sp"; then
+            log_message "Failed to download ${plugin_name}.sp via fallback method"
+        fi
+    done
+}
+
 # Download configuration files
 download_config_files() {
     log_message "Downloading configuration files..."
@@ -177,7 +197,13 @@ main() {
     
     create_directories
     setup_sourcemod
-    download_plugin_sources
+    
+    # Try primary download method
+    if ! download_plugin_sources; then
+        log_message "Primary plugin download failed. Attempting fallback method."
+        fallback_plugin_download
+    fi
+    
     compile_plugins
     download_config_files
     setup_steam_account
