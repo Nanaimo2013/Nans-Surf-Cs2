@@ -14,25 +14,37 @@ handle_error() {
     exit 1
 }
 
-# Download function with retry
+# Download function with retry and optional logging
 download_file() {
     local url="$1"
     local target="$2"
     local max_retries=3
     local retry_count=0
+    local silent="${3:-false}"
 
     while [ $retry_count -lt $max_retries ]; do
-        if curl -sSL --fail --max-time 60 "$url" -o "$target"; then
-            log_message "Successfully downloaded $url to $target"
-            return 0
+        local curl_output
+        if [ "$silent" = "true" ]; then
+            curl_output=$(curl -sSL --fail --max-time 60 "$url" -o "$target" 2>&1) || true
         else
-            retry_count=$((retry_count + 1))
-            log_message "Download failed (attempt $retry_count/$max_retries): $url"
-            sleep 2
+            if curl -sSL --fail --max-time 60 "$url" -o "$target"; then
+                log_message "Successfully downloaded $url to $target"
+                return 0
+            fi
         fi
+
+        retry_count=$((retry_count + 1))
+        log_message "Download failed (attempt $retry_count/$max_retries): $url"
+        
+        if [ "$silent" = "true" ] && [ $retry_count -eq $max_retries ]; then
+            log_message "Silent download failed: $url"
+            return 1
+        fi
+        
+        sleep 2
     done
 
-    handle_error "Failed to download $url after $max_retries attempts"
+    return 1
 }
 
 # Define directories
@@ -78,19 +90,27 @@ setup_sourcemod() {
 
 # Download essential include files
 download_include_files() {
-    log_message "Downloading include files..."
+    log_message "Checking and downloading include files..."
     
     # Define include files to download
     declare -A INCLUDE_SOURCES=(
         ["multicolors.inc"]="https://raw.githubusercontent.com/Bara/Multi-Colors/master/scripting/include/multicolors.inc"
-        ["timer.inc"]="https://raw.githubusercontent.com/surftimer/SurfTimer/master/scripting/include/surftimer.inc"
-        ["mysql.inc"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/include/mysql.inc"
     )
 
-    # Download each include file
-    for include_name in "${!INCLUDE_SOURCES[@]}"; do
-        download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}"
-    done
+    # Check if the plugin requires specific includes
+    local plugin_path="$SCRIPTING_DIR/nans_surf.sp"
+    
+    if [ -f "$plugin_path" ]; then
+        for include_name in "${!INCLUDE_SOURCES[@]}"; do
+            # Check if the plugin uses this include
+            if grep -q "$include_name" "$plugin_path"; then
+                log_message "Downloading $include_name..."
+                if ! download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}" "true"; then
+                    log_message "WARNING: Could not download $include_name. Plugin may not compile correctly."
+                fi
+            fi
+        done
+    fi
 }
 
 # Copy local plugins and configurations
@@ -99,17 +119,17 @@ copy_local_files() {
 
     # Copy local plugins
     if [ -d "$BASE_DIR/plugins" ]; then
-        cp "$BASE_DIR/plugins/"*.sp "$SCRIPTING_DIR/"
+        cp "$BASE_DIR/plugins/"*.sp "$SCRIPTING_DIR/" 2>/dev/null || true
     fi
 
     # Copy local configurations
     if [ -d "$BASE_DIR/configs/surf" ]; then
-        cp "$BASE_DIR/configs/surf/"* "$SOURCEMOD_DIR/configs/surf/"
+        cp "$BASE_DIR/configs/surf/"* "$SOURCEMOD_DIR/configs/surf/" 2>/dev/null || true
     fi
 
     # Copy local maps
     if [ -d "$BASE_DIR/maps" ]; then
-        cp "$BASE_DIR/maps/"*.bsp "$CSGO_DIR/maps/"
+        cp "$BASE_DIR/maps/"*.bsp "$CSGO_DIR/maps/" 2>/dev/null || true
         cp "$BASE_DIR/maps/workshop/"*.bsp "$CSGO_DIR/maps/workshop/" 2>/dev/null || true
     fi
 }
@@ -133,7 +153,8 @@ compile_local_plugins() {
             plugin_name="${sp_file%.*}"
             log_message "Compiling $sp_file to ${plugin_name}.smx"
             
-            if ! "$spcomp" "$sp_file" -o "../plugins/${plugin_name}.smx"; then
+            # Compile with include path
+            if ! "$spcomp" -i"$INCLUDE_DIR" "$sp_file" -o"../plugins/${plugin_name}.smx"; then
                 log_message "WARNING: Failed to compile $sp_file"
             fi
         fi
