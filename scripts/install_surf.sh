@@ -175,35 +175,42 @@ download_plugins() {
 
 # Download maps from GitHub
 download_maps() {
-    log_message "Downloading maps..."
+    log_message "Preparing map download..."
 
-    # Map download URLs
-    local maps=(
-        "surf_beginner.bsp"
-        "surf_easy_v2.bsp"
-        "surf_rookie.bsp"
-        "surf_mesa.bsp"
-    )
+    # Check if maps directory exists
+    if [ ! -d "$CSGO_DIR/maps" ]; then
+        mkdir -p "$CSGO_DIR/maps"
+    fi
 
-    for map_name in "${maps[@]}"; do
-        local target_path="$CSGO_DIR/maps/$map_name"
-        local fallback_urls=(
-            "${REPO_BASE_URL}/maps/${map_name}"
-            "${REPO_BASE_URL}/${map_name}"
-        )
+    # Provide guidance for map acquisition
+    log_message "WARNING: No default maps found in repository."
+    log_message "Please add surf maps manually to $CSGO_DIR/maps/"
+    log_message "Recommended sources:"
+    log_message "- GameBanana (https://gamebanana.com/games/16521)"
+    log_message "- Workshop Collection: [Add Workshop Collection Link]"
+    
+    # Create a placeholder README for map installation
+    cat > "$CSGO_DIR/maps/README.txt" << EOL
+Surf Map Installation Guide
 
-        local downloaded=false
-        for url in "${fallback_urls[@]}"; do
-            if download_file "$url" "$target_path"; then
-                downloaded=true
-                break
-            fi
-        done
+This server requires surf maps to function properly.
 
-        if [ "$downloaded" = false ]; then
-            log_message "WARNING: Could not download ${map_name}"
-        fi
-    done
+How to add maps:
+1. Download .bsp files from:
+   - GameBanana (https://gamebanana.com/games/16521)
+   - Steam Workshop
+2. Place .bsp files in this directory
+
+Recommended Starter Maps:
+- surf_beginner
+- surf_easy
+- surf_intermediate
+- surf_rookie
+
+Suggested Map Sources:
+- GameBanana CS2 Surf Maps
+- Steam Workshop Surf Map Collections
+EOL
 }
 
 # Compile local plugins
