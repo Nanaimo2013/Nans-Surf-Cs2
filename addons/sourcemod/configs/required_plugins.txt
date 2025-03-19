@@ -1,0 +1,30 @@
+// Essential Plugins for Nans Surf Server
+
+[Core Plugins]
+- nans_surf.smx                 // Custom Nans Surf Plugin
+- surftimer.smx                 // Surf Timer
+- movementapi.smx               // Movement API
+- dhooks.smx                    // DHooks Extension
+
+[Admin Plugins]
+- adminmenu.smx                 // SourceMod Admin Menu
+- basecommands.smx              // Basic Admin Commands
+- basebans.smx                  // Ban Management
+- funcommands.smx               // Fun Admin Commands
+
+[Utility Plugins]
+- mapchooser.smx                // Map Voting
+- rockthevote.smx               // Rock The Vote
+- nominations.smx               // Map Nominations
+- mapconfigs.smx                // Map-specific Configurations
+
+[Optional Plugins]
+- advertisements.smx            // Server Advertisements
+- clientprefs.smx                // Client Preferences
+- sounds.smx                    // Custom Sound Management
+
+// Plugin Installation Notes:
+// 1. Ensure compatibility with CS2
+// 2. Download from official SourceMod repositories
+// 3. Check for CS2 specific versions
+// 4. Test each plugin individually 

@@ -1,0 +1,35 @@
+// Nans Surf Server Maplist
+
+// Tier 1 - Beginner
+surf_beginner
+surf_easy_v2
+surf_rookie
+surf_mesa
+
+// Tier 2 - Easy
+surf_utopia
+surf_kitsune
+surf_summer
+surf_japan_ptad
+
+// Tier 3 - Medium
+surf_aircontrol
+surf_catalyst
+surf_paradise
+surf_classics
+
+// Tier 4 - Hard
+surf_ace
+surf_rebel
+surf_network
+surf_greatriver
+
+// Tier 5 - Expert
+surf_forbidden_ways
+surf_nightmare
+surf_expert
+
+// Special Maps
+surf_christmas
+surf_halloween
+surf_summer_party 

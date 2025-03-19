@@ -1,93 +1,71 @@
-# Nans Surf CS2 Server
+# Nans Surf CS2 Server Setup
 
-A feature-rich Counter-Strike 2 surf server with speed overlay, leaderboard functionality, and comprehensive player statistics.
+## Overview
+This repository contains a comprehensive setup for a CS2 Surf server with custom configurations, plugins, and map collections.
 
-## Features
+## Prerequisites
+- Linux-based server (recommended)
+- CS2 Dedicated Server
+- Steam Game Server Account
 
-- **Advanced Timer System**
-  - Accurate timing and speed tracking
-  - Multi-stage support
-  - Checkpoint system
-  - Personal best tracking
-  - World record tracking
+## Installation
 
-- **Player Statistics**
-  - Global rankings
-  - Map-specific rankings
-  - Style-specific rankings
-  - Points system
-  - Awards and achievements
-
-- **HUD Features**
-  - Dynamic speed display
-  - Sync percentage
-  - Strafe counter
-  - Stage progress
-  - Time comparison (WR/PB)
-  - Key display
-  - Velocity meter
-
-- **Server Features**
-  - Multiple surf styles
-  - Custom advertisements
-  - Map voting system (RTV)
-  - Admin commands
-  - Troll commands
-  - VIP system
-
-## Requirements
-
-- Counter-Strike 2 Dedicated Server
-- SourceMod and Metamod for CS2
-- MySQL Database
-- Web server for overlay (optional)
-
-## Quick Start
-
-1. Run the installation script:
+### Automatic Installation
 ```bash
-chmod +x install_surf.sh
-./install_surf.sh
+# Clone the repository
+git clone https://github.com/Nanaimo2013/Nans-Surf-Cs2.git
+cd Nans-Surf-Cs2
+
+# Make setup script executable
+chmod +x scripts/setup_surf_server.sh
+
+# Run the setup script
+./scripts/setup_surf_server.sh
 ```
 
-2. Configure your admin access in `addons/sourcemod/configs/admins_simple.ini`
-3. Start the server
-4. Access the admin menu with `!admin` in chat
+### Manual Installation Steps
+1. Download SourceMod for CS2
+2. Install required plugins
+3. Compile custom plugins
+4. Configure server settings
 
-## Directory Structure
+## Server Features
+- Multiple surf map tiers (Beginner to Expert)
+- Custom surf timer plugin
+- Advanced ranking system
+- Map voting and nomination
+- Admin management tools
 
-```
-├── addons/
-│   ├── sourcemod/
-│   │   ├── configs/
-│   │   │   ├── surf/           # Surf configurations
-│   │   │   ├── admins_simple.ini
-│   │   │   └── advertisements.cfg
-│   │   ├── plugins/
-│   │   │   └── nans_surf.smx   # Main plugin
-│   │   └── data/
-│   │       └── surf/           # Statistics storage
-├── cfg/
-│   ├── server.cfg
-│   └── sourcemod/
-│       └── surf/
-│           └── maplist.txt
-└── maps/                      # Surf maps
-```
+## Map Tiers
+- Tier 1 (Beginner): Easy maps for new players
+- Tier 2 (Easy): Slightly more challenging maps
+- Tier 3 (Medium): Intermediate difficulty
+- Tier 4 (Hard): Advanced maps
+- Tier 5 (Expert): Extremely challenging maps
 
-## Player Commands
+## Workshop Collection
+The server uses a custom workshop collection with carefully curated surf maps.
 
-- `!surf` - Open surf menu
-- `!r` - Restart run
-- `!cp` - Set checkpoint
-- `!tp` - Teleport to checkpoint
-- `!style` - Change surf style
-- `!top` - View leaderboard
-- `!rank` - Show your rank
-- `!rtv` - Vote to change map
-- `!hide` - Toggle player visibility
+## Configuration Files
+- `cfg/server.cfg`: Main server configuration
+- `cfg/workshop_maps.cfg`: Workshop map collection
+- `addons/sourcemod/configs/`: Various plugin configurations
+
+## Troubleshooting
+- Ensure all dependencies are installed
+- Check server logs for any errors
+- Verify Steam Game Server Account is correctly set up
+
+## Contributing
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+[Specify your license here]
 
 ## Credits
-
-Created by Nans & Nanaimo_2013
-Hosted by JmfHosting 
+- Developed by Nanaimo_2013
+- Special thanks to the CS2 and SourceMod communities 

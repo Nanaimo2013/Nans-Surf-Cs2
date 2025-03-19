@@ -7,11 +7,15 @@
 #include <mapchooser>
 #include <timer>
 #include <mysql>
+#include <cstrike>
 
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "2.0.0"
+#define PLUGIN_NAME "Nans Surf Server"
+#define PLUGIN_AUTHOR "Nanaimo_2013"
+#define PLUGIN_DESCRIPTION "Comprehensive Surf Server Plugin for CS2"
+#define PLUGIN_VERSION "2.1.0"
 #define MAX_MAP_LENGTH 128
 #define MAX_STYLE_NAME 32
 #define MAX_RANKS 100
@@ -19,17 +23,21 @@
 
 // Plugin information
 public Plugin myinfo = {
-    name = "Porter's Surf Timer",
-    author = "Nans & Nanaimo",
-    description = "Advanced surf plugin with rankings, leaderboard, and Porter's branding",
+    name = PLUGIN_NAME,
+    author = PLUGIN_AUTHOR,
+    description = PLUGIN_DESCRIPTION,
     version = PLUGIN_VERSION,
-    url = "https://www.twitch.tv/porterdub"
+    url = "https://github.com/Nanaimo2013/Nans-Surf-Cs2"
 };
 
 // Database handle
 Handle g_hDatabase = null;
 
 // ConVars
+ConVar g_cvServerName;
+ConVar g_cvSurfTimerEnabled;
+ConVar g_cvRankingSystem;
+ConVar g_cvMapVoteEnabled;
 ConVar g_cvSurfSpeed;
 ConVar g_cvSurfGravity;
 ConVar g_cvSurfAcceleration;
@@ -64,6 +72,7 @@ float g_fCheckpointAng[MAXPLAYERS + 1][3];
 bool g_bInStartZone[MAXPLAYERS + 1];
 bool g_bInEndZone[MAXPLAYERS + 1];
 bool g_bTimerRunning[MAXPLAYERS + 1];
+bool g_bSurfTimerActive[MAXPLAYERS + 1];
 
 // Map variables
 char g_sCurrentMap[MAX_MAP_LENGTH];
@@ -134,11 +143,20 @@ public void OnPluginStart()
     // Load translations
     LoadTranslations("common.phrases");
     LoadTranslations("porter_surf.phrases");
+    LoadTranslations("nans_surf.phrases");
 }
 
 void CreateConVars()
 {
-    CreateConVar("sm_portersurf_version", PLUGIN_VERSION, "Porter Surf Version", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+    // Server Settings
+    g_cvServerName = CreateConVar("sm_surf_server_name", "Nans Surf Server", "Server Name");
+    
+    // Surf Timer Settings
+    g_cvSurfTimerEnabled = CreateConVar("sm_surf_timer_enabled", "1", "Enable Surf Timer", FCVAR_NOTIFY);
+    g_cvRankingSystem = CreateConVar("sm_surf_ranking_enabled", "1", "Enable Ranking System", FCVAR_NOTIFY);
+    g_cvMapVoteEnabled = CreateConVar("sm_surf_mapvote_enabled", "1", "Enable Map Voting", FCVAR_NOTIFY);
+    
+    // Surf Timer Settings
     g_cvSurfSpeed = CreateConVar("surf_speed", "1.0", "Base surf speed multiplier", FCVAR_NOTIFY);
     g_cvSurfGravity = CreateConVar("surf_gravity", "800.0", "Surf gravity", FCVAR_NOTIFY);
     g_cvSurfAcceleration = CreateConVar("surf_acceleration", "1.0", "Surf acceleration multiplier", FCVAR_NOTIFY);
@@ -222,6 +240,15 @@ void CreateTables()
 
 void RegisterCommands()
 {
+    // Surf Timer Commands
+    RegConsoleCmd("sm_timer", Command_Timer, "Toggle Surf Timer");
+    RegConsoleCmd("sm_rank", Command_Rank, "Show Player Rank");
+    RegConsoleCmd("sm_top", Command_TopPlayers, "Show Top Players");
+    
+    // Map Commands
+    RegConsoleCmd("sm_nominate", Command_NominateMap, "Nominate a Map");
+    RegConsoleCmd("sm_rtv", Command_RockTheVote, "Rock The Vote");
+    
     // Basic commands
     RegConsoleCmd("sm_surf", Command_Surf, "Open surf menu");
     RegConsoleCmd("sm_speed", Command_Speed, "Toggle speed overlay");
@@ -231,14 +258,10 @@ void RegisterCommands()
     RegConsoleCmd("sm_restart", Command_Restart, "Restart current run");
     
     // Ranking commands
-    RegConsoleCmd("sm_rank", Command_Rank, "Show player rank");
-    RegConsoleCmd("sm_top", Command_Top, "Show top players");
     RegConsoleCmd("sm_maprank", Command_MapRank, "Show map rankings");
     RegConsoleCmd("sm_points", Command_Points, "Show player points");
     
     // Map commands
-    RegConsoleCmd("sm_rtv", Command_RTV, "Rock the vote");
-    RegConsoleCmd("sm_nominate", Command_Nominate, "Nominate a map");
     RegConsoleCmd("sm_mapinfo", Command_MapInfo, "Show current map info");
     
     // Admin commands
@@ -417,45 +440,122 @@ char[] GetStyleName(int style)
     return styleName;
 }
 
-public Action Command_RTV(int client, int args)
+public Action Command_Timer(int client, int args)
 {
-    if(!IsValidClient(client))
-        return Plugin_Handled;
-        
-    if(!g_bRTVEnabled)
-    {
-        CPrintToChat(client, "{green}[Surf] {default}RTV is currently disabled.");
+    if (!g_cvSurfTimerEnabled.BoolValue) {
+        ReplyToCommand(client, "[SM] Surf Timer is currently disabled.");
         return Plugin_Handled;
     }
     
-    if(g_bHasVoted[client])
-    {
-        CPrintToChat(client, "{green}[Surf] {default}You have already voted to change the map.");
-        return Plugin_Handled;
-    }
-    
-    g_bHasVoted[client] = true;
-    g_iRTVVotes++;
-    
-    int needed = RoundToCeil(float(GetClientCount(true)) * (g_cvSurfRTVRequiredPercentage.FloatValue / 100.0) - g_iRTVVotes;
-    
-    if(needed > 0)
-    {
-        CPrintToChatAll("{green}[Surf] {olive}%N {default}wants to change the map. {olive}%d {default}more votes needed.", client, needed);
-    }
-    else
-    {
-        CPrintToChatAll("{green}[Surf] {default}Vote passed! Map vote will begin in 5 seconds.");
-        CreateTimer(5.0, Timer_StartMapVote);
+    if (!g_bSurfTimerActive[client]) {
+        StartSurfTimer(client);
+    } else {
+        StopSurfTimer(client);
     }
     
     return Plugin_Handled;
 }
 
-public Action Timer_StartMapVote(Handle timer)
+void StartSurfTimer(int client)
 {
-    InitiateMapVote(MapChange_MapEnd);
-    return Plugin_Stop;
+    g_bSurfTimerActive[client] = true;
+    g_fStartTime[client] = GetGameTime();
+    CPrintToChat(client, "{green}[Surf Timer] {default}Timer started!");
+}
+
+void StopSurfTimer(int client)
+{
+    float totalTime = GetGameTime() - g_fStartTime[client];
+    g_bSurfTimerActive[client] = false;
+    
+    CPrintToChat(client, "{green}[Surf Timer] {default}Your time: {yellow}%.2f seconds", totalTime);
+    
+    // TODO: Implement time saving and ranking logic
+}
+
+public Action Command_Rank(int client, int args)
+{
+    if (!g_cvRankingSystem.BoolValue) {
+        ReplyToCommand(client, "[SM] Ranking system is disabled.");
+        return Plugin_Handled;
+    }
+    
+    DisplayPlayerRank(client);
+    return Plugin_Handled;
+}
+
+void DisplayPlayerRank(int client)
+{
+    // Placeholder rank display
+    CPrintToChat(client, "{green}[Surf Ranks] {default}Your current rank: {yellow}#%d", g_iPlayerRank[client]);
+}
+
+public Action Command_TopPlayers(int client, int args)
+{
+    // TODO: Implement top players display
+    CPrintToChat(client, "{green}[Surf Ranks] {default}Top players feature coming soon!");
+    return Plugin_Handled;
+}
+
+public Action Command_NominateMap(int client, int args)
+{
+    if (!g_cvMapVoteEnabled.BoolValue) {
+        ReplyToCommand(client, "[SM] Map voting is currently disabled.");
+        return Plugin_Handled;
+    }
+    
+    // TODO: Implement map nomination logic
+    CPrintToChat(client, "{green}[Map Vote] {default}Map nomination feature coming soon!");
+    return Plugin_Handled;
+}
+
+public Action Command_RockTheVote(int client, int args)
+{
+    if (!g_cvMapVoteEnabled.BoolValue) {
+        ReplyToCommand(client, "[SM] Map voting is currently disabled.");
+        return Plugin_Handled;
+    }
+    
+    // TODO: Implement Rock The Vote logic
+    CPrintToChat(client, "{green}[Map Vote] {default}Rock The Vote feature coming soon!");
+    return Plugin_Handled;
+}
+
+public void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (IsValidClient(client)) {
+        ResetPlayerTimer(client);
+    }
+}
+
+public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (IsValidClient(client)) {
+        StopSurfTimer(client);
+    }
+}
+
+void ResetPlayerTimer(int client)
+{
+    g_bSurfTimerActive[client] = false;
+    g_fStartTime[client] = 0.0;
+}
+
+bool IsValidClient(int client)
+{
+    return (client > 0 && client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client));
+}
+
+public void OnClientPutInServer(int client)
+{
+    ResetPlayerTimer(client);
+}
+
+public void OnClientDisconnect(int client)
+{
+    ResetPlayerTimer(client);
 }
 
 void SavePlayerTime(int client, float time)
@@ -500,29 +600,6 @@ void UpdatePlayerStats(int client)
         MYSQL_TABLE_PREFIX, MYSQL_TABLE_PREFIX, steamid);
         
     SQL_TQuery(g_hDatabase, SQL_UpdateStatsCallback, query, GetClientUserId(client));
-}
-
-bool IsValidClient(int client)
-{
-    return (client > 0 && client <= MaxClients && IsClientInGame(client) && !IsFakeClient(client));
-}
-
-void LoadPlayerPreferences(int client)
-{
-    char value[8];
-    
-    // Load speed preference
-    GetClientCookie(client, g_hSpeedCookie, value, sizeof(value));
-    g_fPlayerSpeedMultiplier[client] = StringToFloat(value);
-    if(g_fPlayerSpeedMultiplier[client] <= 0.0) g_fPlayerSpeedMultiplier[client] = 1.0;
-
-    // Load style preference
-    GetClientCookie(client, g_hStyleCookie, value, sizeof(value));
-    g_iPlayerStyle[client] = StringToInt(value);
-
-    // Load overlay preference
-    GetClientCookie(client, g_hOverlayCookie, value, sizeof(value));
-    g_bPlayerOverlay[client] = (StringToInt(value) == 1);
 }
 
 public Action Command_Checkpoint(int client, int args)
