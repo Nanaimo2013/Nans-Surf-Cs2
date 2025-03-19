@@ -220,13 +220,28 @@ compile_local_plugins() {
     # Ensure plugins directory exists
     mkdir -p "$PLUGINS_DIR/nans_surftimer"
     
-    # Compile each plugin, but don't stop on errors
-    for plugin in "${SCRIPTING_DIR}"/*.sp "${SCRIPTING_DIR}"/nans_surftimer/*.sp; do
+    # List of standard SourceMod plugins to skip
+    local skip_plugins=(
+        "adminmenu.sp"
+        "basecommands.sp"
+        "mapchooser.sp"
+        "rockthevote.sp"
+    )
+    
+    # Compile each custom plugin, but don't stop on errors
+    for plugin in "${SCRIPTING_DIR}"/nans_surf.sp "${SCRIPTING_DIR}"/nans_surftimer/*.sp; do
         if [ ! -f "$plugin" ]; then
             continue
         fi
         
         plugin_name=$(basename "$plugin")
+        
+        # Skip standard SourceMod plugins
+        if [[ " ${skip_plugins[@]} " =~ " ${plugin_name} " ]]; then
+            log_message "Skipping standard plugin: $plugin_name"
+            continue
+        fi
+        
         output_plugin="${PLUGINS_DIR}/${plugin_name%.sp}.smx"
         
         log_message "Compiling $plugin_name"
@@ -273,17 +288,31 @@ copy_include_files() {
 main() {
     log_message "Starting Nans Surf CS2 Server Installation..."
     
-    create_directories
-    setup_sourcemod
-    download_config_files
-    download_plugins
-    download_maps
+    # Trap any errors and log them
+    trap 'handle_error "Installation failed at line $LINENO"' ERR
+    
+    # Ensure critical directories exist
+    if [ ! -d "$BASE_DIR" ]; then
+        handle_error "Base directory $BASE_DIR does not exist"
+    fi
+    
+    # Perform installation steps with additional error checking
+    create_directories || handle_error "Failed to create directories"
+    setup_sourcemod || handle_error "Failed to setup SourceMod"
+    download_config_files || handle_error "Failed to download configuration files"
+    download_plugins || handle_error "Failed to download plugins"
+    download_maps || handle_error "Failed to prepare map download"
+    
+    # Compile plugins with more lenient error handling
+    set +e  # Disable strict error checking for plugin compilation
     compile_local_plugins
+    set -e  # Re-enable strict error checking
+    
     setup_steam_account
     copy_include_files
     
     # Set correct permissions
-    chmod -R 755 "$SOURCEMOD_DIR"
+    chmod -R 755 "$SOURCEMOD_DIR" || log_message "WARNING: Could not set permissions for SourceMod directory"
     
     # Create installation complete marker
     touch "$BASE_DIR/.surf_installation_complete"
