@@ -40,11 +40,12 @@ BASE_DIR="/home/container"
 GAME_DIR="${BASE_DIR}/game"
 CSGO_DIR="${GAME_DIR}/csgo"
 SOURCEMOD_DIR="$CSGO_DIR/addons/sourcemod"
-MAPS_DIR="$CSGO_DIR/maps"
-WORKSHOP_DIR="$CSGO_DIR/maps/workshop"
-CONFIGS_DIR="$CSGO_DIR/cfg"
-PLUGINS_DIR="$SOURCEMOD_DIR/plugins"
+MAPS_DIR="$BASE_DIR/maps"
+WORKSHOP_DIR="$MAPS_DIR/workshop"
+CONFIGS_DIR="$BASE_DIR/configs"
+PLUGINS_DIR="$BASE_DIR/plugins"
 SCRIPTING_DIR="$SOURCEMOD_DIR/scripting"
+INCLUDE_DIR="$SOURCEMOD_DIR/scripting/include"
 
 # Create required directories
 create_directories() {
@@ -52,9 +53,10 @@ create_directories() {
     mkdir -p "$MAPS_DIR"
     mkdir -p "$WORKSHOP_DIR"
     mkdir -p "$SOURCEMOD_DIR/configs/surf"
-    mkdir -p "$PLUGINS_DIR"
+    mkdir -p "$SOURCEMOD_DIR/plugins"
     mkdir -p "$SCRIPTING_DIR"
-    mkdir -p "$CONFIGS_DIR/sourcemod/surf"
+    mkdir -p "$INCLUDE_DIR"
+    mkdir -p "$CSGO_DIR/cfg/sourcemod/surf"
 }
 
 # Download and setup SourceMod
@@ -74,108 +76,69 @@ setup_sourcemod() {
     rm "$BASE_DIR/sourcemod.tar.gz"
 }
 
-# Download essential plugin sources
-download_plugin_sources() {
-    log_message "Downloading plugin sources..."
+# Download essential include files
+download_include_files() {
+    log_message "Downloading include files..."
     
-    # Define plugin sources
-    declare -A PLUGIN_SOURCES=(
-        # SourceMod Core Plugins
-        ["adminmenu"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/adminmenu.sp"
-        ["basecommands"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/basecommands.sp"
-        ["mapchooser"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/mapchooser.sp"
-        ["rockthevote"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/rockthevote.sp"
-        
-        # Custom Nans Surf Plugin
-        ["nans_surf"]="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/plugins/nans_surf.sp"
+    # Define include files to download
+    declare -A INCLUDE_SOURCES=(
+        ["multicolors.inc"]="https://raw.githubusercontent.com/Bara/Multi-Colors/master/scripting/include/multicolors.inc"
+        ["timer.inc"]="https://raw.githubusercontent.com/surftimer/SurfTimer/master/scripting/include/surftimer.inc"
+        ["mysql.inc"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/include/mysql.inc"
     )
 
-    # Download each plugin source
-    for plugin_name in "${!PLUGIN_SOURCES[@]}"; do
-        download_file "${PLUGIN_SOURCES[$plugin_name]}" "$SCRIPTING_DIR/${plugin_name}.sp"
+    # Download each include file
+    for include_name in "${!INCLUDE_SOURCES[@]}"; do
+        download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}"
     done
 }
 
-# Compile plugins
-compile_plugins() {
-    log_message "Compiling plugins..."
-    cd "$SCRIPTING_DIR"
-    
-    # Verify spcomp exists
-    if [ ! -f "./spcomp" ]; then
-        # Try to find spcomp in SourceMod directory
-        local spcomp_path=$(find "$SOURCEMOD_DIR" -name "spcomp" | head -n 1)
-        
-        if [ -z "$spcomp_path" ]; then
-            handle_error "SourcePawn compiler (spcomp) not found"
-        fi
-        
-        # Use found spcomp path
-        spcomp="$spcomp_path"
-    else
-        spcomp="./spcomp"
+# Copy local plugins and configurations
+copy_local_files() {
+    log_message "Copying local plugins and configurations..."
+
+    # Copy local plugins
+    if [ -d "$BASE_DIR/plugins" ]; then
+        cp "$BASE_DIR/plugins/"*.sp "$SCRIPTING_DIR/"
     fi
+
+    # Copy local configurations
+    if [ -d "$BASE_DIR/configs/surf" ]; then
+        cp "$BASE_DIR/configs/surf/"* "$SOURCEMOD_DIR/configs/surf/"
+    fi
+
+    # Copy local maps
+    if [ -d "$BASE_DIR/maps" ]; then
+        cp "$BASE_DIR/maps/"*.bsp "$CSGO_DIR/maps/"
+        cp "$BASE_DIR/maps/workshop/"*.bsp "$CSGO_DIR/maps/workshop/" 2>/dev/null || true
+    fi
+}
+
+# Compile local plugins
+compile_local_plugins() {
+    log_message "Compiling local plugins..."
     
-    # Compile all .sp files
+    # Find spcomp compiler
+    local spcomp=$(find "$SOURCEMOD_DIR" -name "spcomp" | head -n 1)
+    
+    if [ -z "$spcomp" ]; then
+        log_message "WARNING: SourcePawn compiler not found. Skipping plugin compilation."
+        return
+    fi
+
+    # Compile all .sp files in scripting directory
+    cd "$SCRIPTING_DIR"
     for sp_file in *.sp; do
         if [ -f "$sp_file" ]; then
             plugin_name="${sp_file%.*}"
             log_message "Compiling $sp_file to ${plugin_name}.smx"
             
             if ! "$spcomp" "$sp_file" -o "../plugins/${plugin_name}.smx"; then
-                log_message "Warning: Failed to compile $sp_file"
+                log_message "WARNING: Failed to compile $sp_file"
             fi
         fi
     done
-    
     cd "$BASE_DIR"
-}
-
-# Fallback plugin download method
-fallback_plugin_download() {
-    log_message "Attempting fallback plugin download method..."
-    
-    # Define fallback plugin sources
-    declare -A FALLBACK_SOURCES=(
-        ["adminmenu"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/adminmenu.sp"
-        ["basecommands"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/basecommands.sp"
-        ["mapchooser"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/mapchooser.sp"
-        ["rockthevote"]="https://raw.githubusercontent.com/alliedmodders/sourcemod/master/plugins/rockthevote.sp"
-    )
-
-    # Download each plugin source
-    for plugin_name in "${!FALLBACK_SOURCES[@]}"; do
-        if ! download_file "${FALLBACK_SOURCES[$plugin_name]}" "$SCRIPTING_DIR/${plugin_name}.sp"; then
-            log_message "Failed to download ${plugin_name}.sp via fallback method"
-        fi
-    done
-}
-
-# Download configuration files
-download_config_files() {
-    log_message "Downloading configuration files..."
-    
-    # Configuration files to download
-    local config_files=(
-        "server.cfg"
-        "workshop_maps.cfg"
-        "maplist.txt"
-    )
-    
-    for config in "${config_files[@]}"; do
-        download_file "https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/configs/${config}" "$CONFIGS_DIR/${config}"
-    done
-
-    # Additional SourceMod configuration files
-    local sourcemod_configs=(
-        "admins_simple.ini"
-        "core.cfg"
-        "databases.cfg"
-    )
-
-    for config in "${sourcemod_configs[@]}"; do
-        download_file "https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/configs/sourcemod/${config}" "$SOURCEMOD_DIR/configs/${config}"
-    done
 }
 
 # Steam Game Server Account setup
@@ -188,7 +151,7 @@ setup_steam_account() {
 
     # Create a file with Steam Account Token
     log_message "Setting up Steam Game Server Account"
-    echo "sv_setsteamaccount ${STEAM_ACCOUNT}" > "$CONFIGS_DIR/steam_account.cfg"
+    echo "sv_setsteamaccount ${STEAM_ACCOUNT}" > "$CSGO_DIR/cfg/steam_account.cfg"
 }
 
 # Main installation routine
@@ -197,15 +160,9 @@ main() {
     
     create_directories
     setup_sourcemod
-    
-    # Try primary download method
-    if ! download_plugin_sources; then
-        log_message "Primary plugin download failed. Attempting fallback method."
-        fallback_plugin_download
-    fi
-    
-    compile_plugins
-    download_config_files
+    download_include_files
+    copy_local_files
+    compile_local_plugins
     setup_steam_account
     
     # Set correct permissions
