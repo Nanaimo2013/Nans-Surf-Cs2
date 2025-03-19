@@ -43,12 +43,17 @@ perform_first_time_install() {
         # Ensure scripts directory exists
         mkdir -p /home/container/scripts
         
-        # Download installation script directly from GitHub
-        download_file "${GITHUB_REPO}/install_surf.sh" "/home/container/scripts/install_surf.sh"
+        # Download installation script
+        if ! curl -sSL "https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/scripts/install_surf.sh" -o "/home/container/scripts/install_surf.sh"; then
+            handle_error "Failed to download installation script"
+        fi
         
-        # Run the installation script with error handling
+        # Make script executable
+        chmod +x /home/container/scripts/install_surf.sh
+        
+        # Run the installation script
         if ! bash /home/container/scripts/install_surf.sh; then
-            handle_error "Installation script failed. Check network and repository access."
+            handle_error "Installation script failed"
         fi
     else
         log_message "Surf server already installed. Skipping installation."
