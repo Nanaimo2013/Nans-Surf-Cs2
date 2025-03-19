@@ -74,37 +74,31 @@ setup_sourcemod() {
     rm "$BASE_DIR/sourcemod.tar.gz"
 }
 
-# Download essential plugins
-download_plugins() {
-    log_message "Downloading essential plugins..."
+# Download essential plugin sources
+download_plugin_sources() {
+    log_message "Downloading plugin sources..."
     
-    # Define plugins with their download URLs
-    declare -A PLUGINS=(
-        # Core Plugins
-        ["surftimer"]="https://github.com/surftimer/SurfTimer/releases/latest/download/surftimer.smx"
-        ["movementapi"]="https://github.com/danzayau/MovementAPI/releases/latest/download/MovementAPI.smx"
+    # Define plugin sources
+    declare -A PLUGIN_SOURCES=(
+        # SourceMod Core Plugins
+        ["adminmenu"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/adminmenu.sp"
+        ["basecommands"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/basecommands.sp"
+        ["mapchooser"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/mapchooser.sp"
+        ["rockthevote"]="https://github.com/alliedmodders/sourcemod/raw/main/plugins/rockthevote.sp"
         
-        # Admin Plugins
-        ["adminmenu"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/adminmenu.smx"
-        ["basecommands"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/basecommands.smx"
-        
-        # Utility Plugins
-        ["mapchooser"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/mapchooser.smx"
-        ["rockthevote"]="https://github.com/alliedmodders/sourcemod/raw/master/plugins/rockthevote.smx"
+        # Custom Nans Surf Plugin
+        ["nans_surf"]="https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/plugins/nans_surf.sp"
     )
 
-    # Download each plugin
-    for plugin_name in "${!PLUGINS[@]}"; do
-        download_file "${PLUGINS[$plugin_name]}" "$PLUGINS_DIR/${plugin_name}.smx"
+    # Download each plugin source
+    for plugin_name in "${!PLUGIN_SOURCES[@]}"; do
+        download_file "${PLUGIN_SOURCES[$plugin_name]}" "$SCRIPTING_DIR/${plugin_name}.sp"
     done
-
-    # Download our custom Nans Surf plugin source
-    download_file "https://raw.githubusercontent.com/Nanaimo2013/Nans-Surf-Cs2/main/plugins/nans_surf.sp" "$SCRIPTING_DIR/nans_surf.sp"
 }
 
-# Compile custom plugins
+# Compile plugins
 compile_plugins() {
-    log_message "Compiling custom plugins..."
+    log_message "Compiling plugins..."
     cd "$SCRIPTING_DIR"
     
     # Verify spcomp exists
@@ -122,10 +116,17 @@ compile_plugins() {
         spcomp="./spcomp"
     fi
     
-    # Compile Nans Surf plugin
-    if ! "$spcomp" nans_surf.sp -o ../plugins/nans_surf.smx; then
-        handle_error "Failed to compile nans_surf.sp"
-    fi
+    # Compile all .sp files
+    for sp_file in *.sp; do
+        if [ -f "$sp_file" ]; then
+            plugin_name="${sp_file%.*}"
+            log_message "Compiling $sp_file to ${plugin_name}.smx"
+            
+            if ! "$spcomp" "$sp_file" -o "../plugins/${plugin_name}.smx"; then
+                log_message "Warning: Failed to compile $sp_file"
+            fi
+        fi
+    done
     
     cd "$BASE_DIR"
 }
@@ -176,7 +177,7 @@ main() {
     
     create_directories
     setup_sourcemod
-    download_plugins
+    download_plugin_sources
     compile_plugins
     download_config_files
     setup_steam_account
