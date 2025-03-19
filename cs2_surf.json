@@ -1,0 +1,181 @@
+{
+    "_comment": "CS2 Surf Server Egg - Customized for Nans Surf Server",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2024-03-22T12:00:00+01:00",
+    "name": "Counter-Strike 2 Surf",
+    "author": "Nanaimo_2013 <jadenbowditch1@gmail.com>",
+    "description": "Counter-Strike 2 Surf Server with custom map rotations, SourceMod plugins, and surf-specific configurations.",
+    "features": [
+        "gsl_token",
+        "steam_disk_space"
+    ],
+    "docker_images": {
+        "ghcr.io/1zc/steamrt3-pterodactyl:latest": "SteamRT3 Latest",
+        "ghcr.io/1zc/steamrt3-pterodactyl:beta-latest": "SteamRT3 Public Beta",
+        "ghcr.io/1zc/steamrt3-pterodactyl:dev": "SteamRT3 Dev",
+        "ghcr.io/1zc/steamrt3-pterodactyl:beta-dev": "SteamRT3 Public Beta Dev"
+    },
+    "file_denylist": [],
+    "startup": "./game/cs2.sh -dedicated +ip 0.0.0.0 -port {{SERVER_PORT}} +map {{SRCDS_MAP}} -maxplayers {{SRCDS_MAXPLAYERS}} +sv_setsteamaccount {{STEAM_ACC}} +exec server.cfg +exec workshop_maps.cfg {{CUSTOM_STARTUP_ARGS}}",
+    "config": {
+        "files": "{}",
+        "startup": {
+            "done": "Connection to Steam servers successful"
+        },
+        "logs": "{}",
+        "stop": "quit"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# CS2 Surf Server Installation Script\n\n# Update and install dependencies\napt-get update\napt-get install -y --no-install-recommends \\\n    curl \\\n    lib32gcc-s1 \\\n    ca-certificates \\\n    wget \\\n    unzip\n\n# Prepare installation directory\nmkdir -p /mnt/server/steamcmd\ncd /mnt/server/steamcmd\n\n# Download SteamCMD\ncurl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz\ntar -xzvf steamcmd.tar.gz\n\n# Set up environment\nexport HOME=/mnt/server\nexport STEAMCMD_HOME=/mnt/server/steamcmd\n\n# Install CS2\n./steamcmd.sh \\\n    +force_install_dir /mnt/server \\\n    +login anonymous \\\n    +app_update 730 validate \\\n    +quit\n\n# Create CS2 startup script\nmkdir -p /mnt/server/game\ncat > /mnt/server/game/cs2.sh << 'EOF'\n#!/bin/bash\nLD_LIBRARY_PATH=./bin:$LD_LIBRARY_PATH ./bin/linuxsteamrt64/cs2\nEOF\nchmod +x /mnt/server/game/cs2.sh\n\n# Copy surf-specific scripts\ncp /mnt/server/install_surf.sh /mnt/server/\nchmod +x /mnt/server/install_surf.sh\n\ncp /mnt/server/pterodactyl-startup.sh /mnt/server/\nchmod +x /mnt/server/pterodactyl-startup.sh\n\n# Set proper permissions\nchmod -R 755 /mnt/server",
+            "container": "ghcr.io/1zc/steamrt3-pterodactyl:latest",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Surf Map",
+            "description": "Select the default surf map for the server.",
+            "env_variable": "SRCDS_MAP",
+            "default_value": "surf_beginner",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|alpha_dash",
+            "field_type": "select",
+            "options": [
+                {"label": "Tier 1 - Beginner", "value": "", "optgroup": true},
+                {"label": "surf_beginner", "value": "surf_beginner"},
+                {"label": "surf_easy_v2", "value": "surf_easy_v2"},
+                {"label": "surf_rookie", "value": "surf_rookie"},
+                {"label": "surf_mesa", "value": "surf_mesa"},
+                
+                {"label": "Tier 2 - Easy", "value": "", "optgroup": true},
+                {"label": "surf_utopia", "value": "surf_utopia"},
+                {"label": "surf_kitsune", "value": "surf_kitsune"},
+                {"label": "surf_summer", "value": "surf_summer"},
+                {"label": "surf_japan_ptad", "value": "surf_japan_ptad"},
+                
+                {"label": "Tier 3 - Medium", "value": "", "optgroup": true},
+                {"label": "surf_aircontrol", "value": "surf_aircontrol"},
+                {"label": "surf_catalyst", "value": "surf_catalyst"},
+                {"label": "surf_paradise", "value": "surf_paradise"},
+                {"label": "surf_classics", "value": "surf_classics"},
+                
+                {"label": "Tier 4 - Hard", "value": "", "optgroup": true},
+                {"label": "surf_ace", "value": "surf_ace"},
+                {"label": "surf_rebel", "value": "surf_rebel"},
+                {"label": "surf_network", "value": "surf_network"},
+                {"label": "surf_greatriver", "value": "surf_greatriver"},
+                
+                {"label": "Tier 5 - Expert", "value": "", "optgroup": true},
+                {"label": "surf_forbidden_ways", "value": "surf_forbidden_ways"},
+                {"label": "surf_nightmare", "value": "surf_nightmare"},
+                {"label": "surf_expert", "value": "surf_expert"},
+                
+                {"label": "Special Maps", "value": "", "optgroup": true},
+                {"label": "surf_christmas", "value": "surf_christmas"},
+                {"label": "surf_halloween", "value": "surf_halloween"},
+                {"label": "surf_summer_party", "value": "surf_summer_party"}
+            ]
+        },
+        {
+            "name": "Server Name",
+            "description": "Custom name for your surf server",
+            "env_variable": "SERVER_NAME",
+            "default_value": "Nans Surf CS2 Server",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Steam Account Token",
+            "description": "Steam Game Server Login Token (GSLT)",
+            "env_variable": "STEAM_ACC",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:32",
+            "field_type": "text",
+            "description_additional": "Obtain from https://steamcommunity.com/dev/managegameservers"
+        },
+        {
+            "name": "Source AppID",
+            "description": "Game Application ID (Do Not Modify)",
+            "env_variable": "SRCDS_APPID",
+            "default_value": "730",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|numeric",
+            "field_type": "hidden"
+        },
+        {
+            "name": "Max Players",
+            "description": "Maximum number of players on the server",
+            "env_variable": "SRCDS_MAXPLAYERS",
+            "default_value": "32",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|min:1|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Server Tier",
+            "description": "Difficulty tier for surf maps",
+            "env_variable": "SURF_TIER",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|between:1,5",
+            "field_type": "select",
+            "options": [
+                {"label": "Tier 1 - Beginner", "value": "1"},
+                {"label": "Tier 2 - Easy", "value": "2"},
+                {"label": "Tier 3 - Medium", "value": "3"},
+                {"label": "Tier 4 - Hard", "value": "4"},
+                {"label": "Tier 5 - Expert", "value": "5"}
+            ]
+        },
+        {
+            "name": "Disable Updates",
+            "description": "Prevent automatic game server updates",
+            "env_variable": "SRCDS_STOP_UPDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|in:0,1",
+            "field_type": "select",
+            "options": [
+                {"label": "Allow Updates", "value": "0"},
+                {"label": "Disable Updates", "value": "1"}
+            ]
+        },
+        {
+            "name": "Validate Install",
+            "description": "Verify game files during installation",
+            "env_variable": "SRCDS_VALIDATE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|numeric|in:0,1",
+            "field_type": "select",
+            "options": [
+                {"label": "Skip Validation", "value": "0"},
+                {"label": "Validate Files", "value": "1"}
+            ]
+        },
+        {
+            "name": "Custom Startup Arguments",
+            "description": "Additional launch parameters for the server",
+            "env_variable": "CUSTOM_STARTUP_ARGS",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:255",
+            "field_type": "text"
+        }
+    ]
+} 
