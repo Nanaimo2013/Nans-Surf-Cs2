@@ -20,5 +20,5 @@ jobs:
       
       - name: Build & Publish Docker image
         run: |
-          docker build . -t ghcr.io/nookure/cs2-surf:latest -f docker/RT3-Dockerfile
-          docker push ghcr.io/nookure/cs2-surf:latest 
+          docker build . -t ghcr.io/Nanaimo2013/Nans-Surf-Cs2:latest -f docker/RT3-Dockerfile
+          docker push ghcr.io/Nanaimo2013/Nans-Surf-Cs2:latest 
