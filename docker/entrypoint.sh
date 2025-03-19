@@ -104,16 +104,26 @@ fi
 # Download workshop maps if needed
 if [ ! -z ${DOWNLOAD_WORKSHOP_MAPS} ] && [ ${DOWNLOAD_WORKSHOP_MAPS} -eq 1 ]; then
     echo "Downloading workshop maps..."
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053395359 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053703590 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053706898 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053712237 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053715412 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053718896 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053722154 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053725698 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053729012 +quit
-    ./steamcmd/steamcmd.sh +login anonymous +force_install_dir /home/container/game +workshop_download_item 730 3053732456 +quit
+    # Create workshop directory if it doesn't exist
+    mkdir -p /home/container/game/csgo/maps/workshop
+    
+    # Download surf maps
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053395359 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053703590 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053706898 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053712237 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053715412 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053718896 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053722154 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053725698 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053729012 +quit
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 3053732456 +quit
+    
+    # Download surf_beginner map
+    ./steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +workshop_download_item 730 2124557811 +quit
+    
+    # Copy workshop maps to the correct location
+    cp -r /home/container/game/steamapps/workshop/content/730/* /home/container/game/csgo/maps/workshop/
 fi
 
 # Create a default server.cfg if it doesn't exist
@@ -238,7 +248,39 @@ fi
 if [ ! -f "game/csgo/addons/sourcemod/sourcemod.conf" ]; then
     echo "Installing SourceMod..."
     curl -sqL "https://sm.alliedmods.net/smdrop/1.12/sourcemod-1.12.0-git6950-linux.tar.gz" | tar zxvf - -C game/csgo
+    
+    # Fix permissions for SourceMod binaries
+    chmod +x game/csgo/addons/sourcemod/bin/*.so
+    chmod +x game/csgo/addons/sourcemod/bin/sourcemod_mm_i486.so
+    chmod +x game/csgo/addons/sourcemod/bin/sourcemod_mm_x86_64.so
 fi
+
+# Create surf-specific SourceMod config
+cat > game/csgo/cfg/sourcemod/surf.cfg << 'EOCFG'
+// Surf-specific settings
+sv_accelerate 10
+sv_airaccelerate 150
+sv_gravity 800
+sv_maxvelocity 3500
+sv_staminajumpcost 0
+sv_staminalandcost 0
+sv_staminamax 0
+sv_enablebunnyhopping 1
+sv_autobunnyhopping 1
+
+// Timer settings
+sm_timer_enabled 1
+sm_timer_mode 0
+sm_timer_physics 0
+
+// Server settings
+sv_infinite_ammo 2
+mp_ignore_round_win_conditions 1
+mp_warmup_end
+mp_freezetime 0
+mp_roundtime 60
+mp_timelimit 0
+EOCFG
 
 echo "Done! Surf server components installed."
 EOL
@@ -346,7 +388,17 @@ if [[ ${MODIFIED_STARTUP} == *"cs2.sh"* ]]; then
     
     # Add game-specific parameters
     if [[ ${MODIFIED_STARTUP} != *"+game_type"* ]]; then
-        MODIFIED_STARTUP="${MODIFIED_STARTUP} +game_type 0 +game_mode 0 +mapgroup mg_active"
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +game_type 0 +game_mode 0"
+    fi
+    
+    # Add surf-specific configurations
+    if [[ ${MODIFIED_STARTUP} != *"+exec surf.cfg"* ]]; then
+        MODIFIED_STARTUP="${MODIFIED_STARTUP} +exec surf.cfg"
+    fi
+    
+    # Ensure map is loaded from workshop
+    if [[ ${MODIFIED_STARTUP} == *"+map surf_beginner"* ]]; then
+        MODIFIED_STARTUP=${MODIFIED_STARTUP/"+map surf_beginner"/"+map workshop/2124557811/surf_beginner"}
     fi
     
     # Add Steam API initialization parameters
