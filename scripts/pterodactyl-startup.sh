@@ -26,8 +26,9 @@ download_file() {
     
     log_message "Downloading: $url"
     
-    if ! curl -sSL --fail "$url" -o "$target"; then
-        handle_error "Failed to download $url"
+    # Increase timeout and add verbose error reporting
+    if ! curl -sSL --fail --max-time 60 --retry 3 "$url" -o "$target"; then
+        handle_error "Failed to download $url. Check network connection and URL."
     fi
     
     chmod +x "$target"
@@ -45,8 +46,10 @@ perform_first_time_install() {
         # Download installation script directly from GitHub
         download_file "${GITHUB_REPO}/install_surf.sh" "/home/container/scripts/install_surf.sh"
         
-        # Run the installation script
-        bash /home/container/scripts/install_surf.sh
+        # Run the installation script with error handling
+        if ! bash /home/container/scripts/install_surf.sh; then
+            handle_error "Installation script failed. Check network and repository access."
+        fi
     else
         log_message "Surf server already installed. Skipping installation."
     fi

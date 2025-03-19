@@ -61,8 +61,9 @@ create_directories() {
 # Download and setup SourceMod
 setup_sourcemod() {
     log_message "Setting up SourceMod..."
-    local sm_release=$(curl -s https://api.github.com/repos/alliedmodders/sourcemod/releases/latest)
-    local sm_download_url=$(echo "$sm_release" | grep -o 'https://.*sourcemod-.*-linux.tar.gz')
+    
+    # Hardcoded SourceMod download URL for CS2
+    local sm_download_url="https://sm.alliedmods.net/smdrop/1.11/sourcemod-1.11.0-git6934-linux.tar.gz"
     
     if [ -z "$sm_download_url" ]; then
         handle_error "Could not find SourceMod download URL"
@@ -96,6 +97,12 @@ download_project_files() {
 compile_plugin() {
     log_message "Compiling Nans Surf Plugin..."
     cd "$SOURCEMOD_DIR/scripting"
+    
+    # Check if spcomp exists
+    if [ ! -f "./spcomp" ]; then
+        handle_error "SourcePawn compiler (spcomp) not found"
+    fi
+    
     ./spcomp nans_surf.sp -o ../plugins/nans_surf.smx
     cd "$BASE_DIR"
 }
