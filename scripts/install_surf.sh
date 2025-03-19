@@ -89,48 +89,43 @@ setup_sourcemod() {
     rm "$BASE_DIR/sourcemod.tar.gz"
 }
 
-# Download essential include files
-download_include_files() {
-    log_message "Downloading essential include files..."
-    
-    # Define include files to download
-    declare -A INCLUDE_SOURCES=(
-        ["multicolors.inc"]="https://raw.githubusercontent.com/Bara/Multi-Colors/master/scripting/include/multicolors.inc"
-        ["timer.inc"]="https://raw.githubusercontent.com/surftimer/SurfTimer/master/scripting/include/surftimer.inc"
-    )
-
-    # Ensure include directory exists
-    mkdir -p "$INCLUDE_DIR"
-
-    # Download each include file
-    for include_name in "${!INCLUDE_SOURCES[@]}"; do
-        log_message "Downloading $include_name..."
-        if ! download_file "${INCLUDE_SOURCES[$include_name]}" "$INCLUDE_DIR/${include_name}" "true"; then
-            log_message "WARNING: Could not download $include_name. Plugin may not compile correctly."
-        fi
-    done
-}
-
 # Download configuration files from GitHub
 download_config_files() {
     log_message "Downloading configuration files..."
 
     # Configuration files to download
     local config_files=(
-        "configs/surf/server.cfg"
-        "configs/surf/workshop_maps.cfg"
-        "configs/surf/maplist.txt"
-        "configs/surf/maptiers.cfg"
-        "configs/surf/admin_commands.cfg"
-        "configs/surf/hud.cfg"
-        "configs/surf/quickmenu.cfg"
-        "configs/surf/storage.cfg"
-        "configs/surf/surf_advertisements.cfg"
+        "server.cfg"
+        "workshop_maps.cfg"
+        "maplist.txt"
+        "maptiers.cfg"
+        "admin_commands.cfg"
+        "hud.cfg"
+        "quickmenu.cfg"
+        "storage.cfg"
+        "surf_advertisements.cfg"
     )
 
     for config in "${config_files[@]}"; do
-        local target_path="$SOURCEMOD_DIR/${config}"
-        download_file "${REPO_BASE_URL}/${config}" "$target_path"
+        local target_path="$SOURCEMOD_DIR/configs/surf/$config"
+        local fallback_urls=(
+            "${REPO_BASE_URL}/configs/surf/${config}"
+            "${REPO_BASE_URL}/${config}"
+        )
+
+        local downloaded=false
+        for url in "${fallback_urls[@]}"; do
+            if download_file "$url" "$target_path"; then
+                downloaded=true
+                break
+            fi
+        done
+
+        if [ "$downloaded" = false ]; then
+            log_message "WARNING: Could not download ${config}"
+            # Create an empty configuration file if download fails
+            touch "$target_path"
+        fi
     done
 
     # Create autoexec.cfg
@@ -148,12 +143,33 @@ download_plugins() {
 
     # Plugins to download
     local plugins=(
-        "plugins/nans_surf.sp"
+        "nans_surf.sp"
+        "nans_surftimer/database.sp"
+        "nans_surftimer/player_manager.sp"
+        "nans_surftimer/leaderboard.sp"
+        "nans_surftimer/replay_system.sp"
+        "nans_surftimer/map_manager.sp"
+        "nans_surftimer/zones.sp"
     )
 
     for plugin in "${plugins[@]}"; do
-        local target_path="$SCRIPTING_DIR/$(basename "$plugin")"
-        download_file "${REPO_BASE_URL}/${plugin}" "$target_path"
+        local target_path="$SCRIPTING_DIR/$plugin"
+        local fallback_urls=(
+            "${REPO_BASE_URL}/plugins/${plugin}"
+            "${REPO_BASE_URL}/${plugin}"
+        )
+
+        local downloaded=false
+        for url in "${fallback_urls[@]}"; do
+            if download_file "$url" "$target_path"; then
+                downloaded=true
+                break
+            fi
+        done
+
+        if [ "$downloaded" = false ]; then
+            log_message "WARNING: Could not download ${plugin}"
+        fi
     done
 }
 
@@ -161,17 +177,32 @@ download_plugins() {
 download_maps() {
     log_message "Downloading maps..."
 
-    # Map download URLs (you may need to adjust these)
-    declare -A MAP_SOURCES=(
-        ["surf_beginner.bsp"]="${REPO_BASE_URL}/maps/surf_beginner.bsp"
-        ["surf_easy_v2.bsp"]="${REPO_BASE_URL}/maps/surf_easy_v2.bsp"
-        ["surf_rookie.bsp"]="${REPO_BASE_URL}/maps/surf_rookie.bsp"
-        ["surf_mesa.bsp"]="${REPO_BASE_URL}/maps/surf_mesa.bsp"
+    # Map download URLs
+    local maps=(
+        "surf_beginner.bsp"
+        "surf_easy_v2.bsp"
+        "surf_rookie.bsp"
+        "surf_mesa.bsp"
     )
 
-    # Download maps to game maps directory
-    for map_name in "${!MAP_SOURCES[@]}"; do
-        download_file "${MAP_SOURCES[$map_name]}" "$CSGO_DIR/maps/$map_name"
+    for map_name in "${maps[@]}"; do
+        local target_path="$CSGO_DIR/maps/$map_name"
+        local fallback_urls=(
+            "${REPO_BASE_URL}/maps/${map_name}"
+            "${REPO_BASE_URL}/${map_name}"
+        )
+
+        local downloaded=false
+        for url in "${fallback_urls[@]}"; do
+            if download_file "$url" "$target_path"; then
+                downloaded=true
+                break
+            fi
+        done
+
+        if [ "$downloaded" = false ]; then
+            log_message "WARNING: Could not download ${map_name}"
+        fi
     done
 }
 
@@ -187,9 +218,12 @@ compile_local_plugins() {
         return
     fi
 
+    # Ensure plugins directory exists
+    mkdir -p "$SOURCEMOD_DIR/plugins/nans_surftimer"
+
     # Compile all .sp files in scripting directory
     cd "$SCRIPTING_DIR"
-    for sp_file in *.sp; do
+    for sp_file in *.sp nans_surftimer/*.sp; do
         if [ -f "$sp_file" ]; then
             plugin_name="${sp_file%.*}"
             log_message "Compiling $sp_file to ${plugin_name}.smx"
@@ -222,7 +256,6 @@ main() {
     
     create_directories
     setup_sourcemod
-    download_include_files
     download_config_files
     download_plugins
     download_maps

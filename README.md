@@ -1,33 +1,59 @@
-# Nans Surf CS2 Server Setup
+# Nans Surf CS2 Server Plugin
 
-## Overview
-This repository contains a comprehensive setup for a CS2 Surf server with custom configurations, plugins, and map collections.
+## Plugin Structure
 
-## Prerequisites
-- Linux-based server (recommended)
-- CS2 Dedicated Server
-- Steam Game Server Account
+### Core Plugins
+- `nans_surf.sp`: Main server plugin
+- `nans_surftimer/`
+  - `database.sp`: Database handling
+  - `player_manager.sp`: Player statistics and rank management
+  - `leaderboard.sp`: Leaderboard and ranking system
+  - `replay_system.sp`: Replay recording and playback
+  - `map_manager.sp`: Map and stage management
+  - `zones.sp`: Zone detection and management
 
 ## Installation
 
-### Automatic Installation
-```bash
-# Clone the repository
-git clone https://github.com/Nanaimo2013/Nans-Surf-Cs2.git
-cd Nans-Surf-Cs2
+### Prerequisites
+- CS2 Server
+- SourceMod 1.11+
+- Steam Game Server Account
 
-# Make setup script executable
-chmod +x scripts/setup_surf_server.sh
+### Quick Install
+1. Run the `install_surf.sh` script
+2. Configure environment variables
+3. Start the server
 
-# Run the setup script
-./scripts/setup_surf_server.sh
-```
+### Environment Variables
+- `STEAM_ACCOUNT`: Required Steam Game Server Token
+- `SERVER_PORT`: Server port (default: 27015)
+- `SRCDS_MAP`: Starting map (default: surf_beginner)
+- `SRCDS_MAXPLAYERS`: Max players (default: 32)
 
-### Manual Installation Steps
-1. Download SourceMod for CS2
-2. Install required plugins
-3. Compile custom plugins
-4. Configure server settings
+## Configuration
+
+### Server Configuration
+Edit files in `csgo/cfg/sourcemod/surf/`:
+- `server.cfg`: Server settings
+- `workshop_maps.cfg`: Workshop map configuration
+- `admin_commands.cfg`: Admin command settings
+
+## Commands
+
+### Player Commands
+- `!r`: Restart run
+- `!re`: Repeat stage
+- `!st`: Stuck/Restart
+- `!cp`: Set checkpoint
+- `!tp`: Teleport to checkpoint
+
+### Admin Commands
+- `!zones`: Manage map zones
+- `!settier`: Set map tier
+- `!resetmap`: Reset map records
+
+## Support
+Report issues on GitHub repository.
 
 ## Server Features
 - Multiple surf map tiers (Beginner to Expert)

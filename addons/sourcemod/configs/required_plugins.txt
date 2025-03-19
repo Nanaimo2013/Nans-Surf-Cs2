@@ -2,7 +2,7 @@
 
 [Core Plugins]
 - nans_surf.smx                 // Custom Nans Surf Plugin
-- surftimer.smx                 // Surf Timer
+- nans_surftimer.smx            // Custom Robust Surf Timer
 - movementapi.smx               // Movement API
 - dhooks.smx                    // DHooks Extension
 
@@ -25,6 +25,5 @@
 
 // Plugin Installation Notes:
 // 1. Ensure compatibility with CS2
-// 2. Download from official SourceMod repositories
-// 3. Check for CS2 specific versions
-// 4. Test each plugin individually 
+// 2. Compile custom plugins with latest SourceMod
+// 3. Test each plugin individually 
