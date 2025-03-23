@@ -9,98 +9,37 @@ RUN         mkdir -p /etc/sudoers.d && \
             chmod 0440 /etc/sudoers.d/flatdeb
 
 ENV         DEBIAN_FRONTEND=noninteractive
-RUN         apt update && \
-            apt install -y \
-            iproute2 \
-            curl \
-            tar \
-            procps \
-            lib32gcc1 \
-            lib32stdc++6 \
-            lib32ncurses6 \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libsdl2-2.0-0 \
-            libnm0 \
-            ca-certificates \
-            locales \
-            tzdata \
-            net-tools \
-            iputils-ping \
-            netcat \
-            iptables \
-            gcc \
-            g++ \
-            make \
-            git \
-            unzip \
-            lib32z1 \
-            python3 \
-            build-essential && \
-            apt-get clean
+RUN         apt update && apt install -y iproute2 && apt-get clean
 
-# Set up locales
-RUN         locale-gen en_US.UTF-8
-ENV         LANG=en_US.UTF-8 \
-            LANGUAGE=en_US:en \
-            LC_ALL=en_US.UTF-8
-
-# Create container user and set up directories
-RUN         useradd -m -d /home/container -s /bin/bash container && \
-            mkdir -p /home/container/.steam/sdk32 && \
-            mkdir -p /home/container/.steam/sdk64 && \
-            mkdir -p /home/container/game/csgo/addons && \
-            mkdir -p /home/container/game/csgo/cfg/sourcemod && \
-            mkdir -p /home/container/game/csgo/addons/sourcemod/plugins && \
-            mkdir -p /home/container/game/csgo/addons/sourcemod/data && \
-            mkdir -p /home/container/game/csgo/addons/sourcemod/configs && \
-            chown -R container:container /home/container
-
-# Switch to container user
 USER        container
 ENV         USER=container HOME=/home/container
 WORKDIR     /home/container
 
-# Create empty directories for optional content
-RUN         mkdir -p /home/container/tmp/materials && \
-            mkdir -p /home/container/tmp/models && \
-            mkdir -p /home/container/tmp/sound && \
-            mkdir -p /home/container/tmp/data
+# Create necessary directories
+RUN         mkdir -p /home/container/game/csgo/cfg/sourcemod \
+            /home/container/game/csgo/addons/sourcemod/plugins \
+            /home/container/game/csgo/addons/sourcemod/configs \
+            /home/container/game/csgo/addons/sourcemod/data
 
-# Copy configuration files
-COPY        --chown=container:container ./gamefiles/configs/core/* /home/container/game/csgo/cfg/
-COPY        --chown=container:container ./gamefiles/configs/sourcemod/* /home/container/game/csgo/cfg/sourcemod/
+# Copy configuration files if they exist
+COPY        --chown=container:container ./gamefiles/configs/core/ /home/container/game/csgo/cfg/
+COPY        --chown=container:container ./gamefiles/configs/sourcemod/ /home/container/game/csgo/cfg/sourcemod/
 COPY        --chown=container:container ./gamefiles/configs/sourcemod/surf/ /home/container/game/csgo/cfg/sourcemod/surf/
 
-# Copy plugins if they exist
-COPY        --chown=container:container ./gamefiles/plugins/compiled/*.smx /home/container/game/csgo/addons/sourcemod/plugins/
-
-# Move optional content to final location if it exists
-RUN         if [ "$(ls -A /home/container/tmp/materials)" ]; then \
-                cp -r /home/container/tmp/materials/* /home/container/game/csgo/materials/; \
-            fi && \
-            if [ "$(ls -A /home/container/tmp/models)" ]; then \
-                cp -r /home/container/tmp/models/* /home/container/game/csgo/models/; \
-            fi && \
-            if [ "$(ls -A /home/container/tmp/sound)" ]; then \
-                cp -r /home/container/tmp/sound/* /home/container/game/csgo/sound/; \
-            fi && \
-            if [ "$(ls -A /home/container/tmp/data)" ]; then \
-                cp -r /home/container/tmp/data/* /home/container/game/csgo/addons/sourcemod/data/; \
-            fi && \
-            rm -rf /home/container/tmp
+# Copy pre-compiled plugins
+COPY        --chown=container:container ./gamefiles/plugins/compiled/ /home/container/game/csgo/addons/sourcemod/plugins/
 
 # Copy entrypoint script
 COPY        --chown=container:container ./docker/entrypoint.sh /entrypoint.sh
 RUN         chmod +x /entrypoint.sh
 
-# Set default environment variables
+# Set default environment variables for Pterodactyl
 ENV         SRCDS_APPID=730 \
             SRCDS_PORT=25566 \
             SRCDS_MAXPLAYERS=24 \
-            SRCDS_MAP="workshop/2124557811/surf_beginner" \
+            SRCDS_MAP="de_dust2" \
             SRCDS_VALIDATE=1 \
-            DOWNLOAD_WORKSHOP_MAPS=1 \
-            COMPILE_PLUGINS=0
+            DOWNLOAD_WORKSHOP_MAPS=0 \
+            STEAM_ACC="anonymous"
 
 CMD         [ "/bin/bash", "/entrypoint.sh" ]

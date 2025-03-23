@@ -14,6 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Prepare directories for Docker build
+        run: |
+          # Create empty directories to prevent Docker build errors if they don't exist
+          mkdir -p gamefiles/plugins/compiled
+          mkdir -p gamefiles/configs/core
+          mkdir -p gamefiles/configs/sourcemod/surf
+          touch gamefiles/configs/core/.gitkeep
+          touch gamefiles/configs/sourcemod/.gitkeep
+          touch gamefiles/configs/sourcemod/surf/.gitkeep
+      
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
