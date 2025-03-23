@@ -3,7 +3,7 @@ LABEL       author="Nans" maintainer="jmfcorp@jmfhosting.com"
 LABEL       org.opencontainers.image.description="SteamRT3 Nans Platform image for CS2 Surf servers with fixes"
 LABEL       org.opencontainers.image.source="https://github.com/nanaimo2013/Nans-Surf-Cs2"
 
-# Prep OS
+# Prep OS and install dependencies
 RUN         mkdir -p /etc/sudoers.d && \
             echo "%sudo ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/flatdeb && \
             chmod 0440 /etc/sudoers.d/flatdeb
@@ -11,15 +11,21 @@ RUN         mkdir -p /etc/sudoers.d && \
 ENV         DEBIAN_FRONTEND=noninteractive
 RUN         apt update && apt install -y iproute2 && apt-get clean
 
-USER        container
-ENV         USER=container HOME=/home/container
-WORKDIR     /home/container
+# Create container user and group
+RUN         groupadd -g 1000 container && \
+            useradd -m -u 1000 -g container container
 
-# Create necessary directories
+# Set up directory structure
 RUN         mkdir -p /home/container/game/csgo/cfg/sourcemod \
             /home/container/game/csgo/addons/sourcemod/plugins \
             /home/container/game/csgo/addons/sourcemod/configs \
-            /home/container/game/csgo/addons/sourcemod/data
+            /home/container/game/csgo/addons/sourcemod/data && \
+            chown -R container:container /home/container
+
+# Switch to container user
+USER        container
+ENV         USER=container HOME=/home/container
+WORKDIR     /home/container
 
 # Copy configuration files if they exist
 COPY        --chown=container:container ./gamefiles/configs/core/ /home/container/game/csgo/cfg/
