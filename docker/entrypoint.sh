@@ -20,10 +20,6 @@ exec ./bin/linuxsteamrt64/cs2 "$@"
 EOL
 chmod +x /home/container/game/cs2.sh
 
-# Update CS2 Server
-echo "Updating CS2 Server..."
-/home/container/steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +app_update ${SRCDS_APPID} ${SRCDS_VALIDATE:++validate} +quit
-
 # Default variables
 SRCDS_PORT="${SERVER_PORT:-25566}"
 SRCDS_MAXPLAYERS="${SERVER_MAXPLAYERS:-64}"
