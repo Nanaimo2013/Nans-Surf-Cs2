@@ -1,29 +1,57 @@
-// Essential Plugins for Nans Surf Server
+// Essential Plugins for Nans Surf Server (CS2)
+// Format: plugin_name.smx // version // description // dependencies
 
 [Core Plugins]
-- nans_surf.smx                 // Custom Nans Surf Plugin
-- nans_surftimer.smx            // Custom Robust Surf Timer
-- movementapi.smx               // Movement API
-- dhooks.smx                    // DHooks Extension
+metamod.vdf             // 2.0.0+ // MetaMod:Source for CS2 // -
+sourcemod.vdf          // 1.12.0+ // SourceMod for CS2 // metamod
+nanssurf.smx           // 2.0.0 // Core surf plugin for CS2 // dhooks2, movementapi
+nanssurfstats.smx      // 2.0.0 // Statistics tracking // nanssurf
+nanssurftimer.smx      // 2.0.0 // Timer system // nanssurf, nanssurfstats
+nanssurfdiscord.smx    // 2.0.0 // Discord integration // nanssurf, nanssurfstats, nanssurftimer
+movementapi.smx        // 3.0.0 // CS2 Movement mechanics API // dhooks2
+dhooks2.smx            // 2.3.0 // Dynamic hooks extension for CS2 // -
 
 [Admin Plugins]
-- adminmenu.smx                 // SourceMod Admin Menu
-- basecommands.smx              // Basic Admin Commands
-- basebans.smx                  // Ban Management
-- funcommands.smx               // Fun Admin Commands
+adminmenu.smx          // CS2 // SourceMod admin menu // -
+basecommands.smx       // CS2 // Basic admin commands // adminmenu
+basebans.smx           // CS2 // Ban management // adminmenu
+basecomm.smx           // CS2 // Communication control // adminmenu
+funcommands.smx        // CS2 // Fun admin commands // adminmenu
 
 [Utility Plugins]
-- mapchooser.smx                // Map Voting
-- rockthevote.smx               // Rock The Vote
-- nominations.smx               // Map Nominations
-- mapconfigs.smx                // Map-specific Configurations
+mapchooser_extended.smx // CS2 // Enhanced map voting system // -
+rockthevote.smx        // CS2 // Rock The Vote // mapchooser_extended
+nominations.smx        // CS2 // Map nominations // mapchooser_extended
+mapconfigs.smx        // CS2 // Map configs // -
+clientprefs.smx       // CS2 // Client preferences // -
 
 [Optional Plugins]
-- advertisements.smx            // Server Advertisements
-- clientprefs.smx                // Client Preferences
-- sounds.smx                    // Custom Sound Management
+advertisements.smx     // CS2 // Server advertisements // -
+customchat.smx        // CS2 // Chat customization // -
+connectmessages.smx   // CS2 // Join/leave messages // -
+rankme.smx            // CS2 // Player ranking // nanssurfstats
 
-// Plugin Installation Notes:
-// 1. Ensure compatibility with CS2
-// 2. Compile custom plugins with latest SourceMod
-// 3. Test each plugin individually 
+// Installation Notes:
+// 1. All plugins MUST be CS2 compatible - do not use CS:GO or older versions
+// 2. Compile custom plugins with SourceMod 1.12+ and MetaMod 2.0+ for CS2
+// 3. Install dependencies in the correct order
+// 4. Check plugin logs for CS2 compatibility issues
+// 5. Keep plugins updated to latest CS2-compatible versions
+// 6. Some plugins may need CS2-specific configuration adjustments
+
+// Load Order:
+// 1. MetaMod:Source
+// 2. SourceMod
+// 3. Extensions (dhooks2)
+// 4. Core APIs (movementapi)
+// 5. Core plugins (nanssurf, stats, timer)
+// 6. Admin plugins
+// 7. Utility plugins
+// 8. Optional plugins
+
+// CS2-Specific Notes:
+// - Ensure all plugins are specifically built for CS2
+// - Some CS:GO plugins may not work in CS2
+// - Check for CS2 updates that might affect plugin compatibility
+// - Monitor server performance with new plugins
+// - Test all plugins in a development environment first 

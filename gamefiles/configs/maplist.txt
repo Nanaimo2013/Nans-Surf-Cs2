@@ -1,53 +1,59 @@
 // Nans Surf Server - Official Map Rotation
+// Format: mapname // tier // author // style
 
-// Tier 1 - Beginner
-"Tier 1 Maps"
-{
-    "surf_beginner"
-    "surf_easy_v2"
-    "surf_rookie"
-    "surf_mesa"
-}
+// Tier 1 - Beginner (Very Easy)
+surf_beginner         // T1 // Unknown // Linear
+surf_easy_v2         // T1 // Unknown // Linear
+surf_rookie          // T1 // Unknown // Linear
+surf_mesa            // T1 // Unknown // Linear
+surf_learning        // T1 // Unknown // Linear
+surf_basics          // T1 // Unknown // Linear
+surf_training_day    // T1 // Unknown // Linear
 
 // Tier 2 - Easy
-"Tier 2 Maps"
-{
-    "surf_utopia"
-    "surf_kitsune"
-    "surf_summer"
-    "surf_japan_ptad"
-}
+surf_utopia          // T2 // Unknown // Linear
+surf_kitsune         // T2 // Unknown // Linear
+surf_summer          // T2 // Unknown // Linear
+surf_japan_ptad      // T2 // Unknown // Linear
+surf_mesa_advanced   // T2 // Unknown // Linear
+surf_simple          // T2 // Unknown // Linear
+surf_flow            // T2 // Unknown // Linear
 
 // Tier 3 - Medium
-"Tier 3 Maps"
-{
-    "surf_aircontrol"
-    "surf_catalyst"
-    "surf_paradise"
-    "surf_classics"
-}
+surf_aircontrol      // T3 // Unknown // Linear
+surf_catalyst        // T3 // Unknown // Linear
+surf_paradise        // T3 // Unknown // Linear
+surf_classics       // T3 // Unknown // Linear
+surf_momentum       // T3 // Unknown // Linear
+surf_zen            // T3 // Unknown // Linear
+surf_velocity       // T3 // Unknown // Linear
 
 // Tier 4 - Hard
-"Tier 4 Maps"
-{
-    "surf_ace"
-    "surf_rebel"
-    "surf_network"
-    "surf_greatriver"
-}
+surf_ace            // T4 // Unknown // Linear
+surf_rebel          // T4 // Unknown // Linear
+surf_network        // T4 // Unknown // Linear
+surf_greatriver     // T4 // Unknown // Linear
+surf_technical      // T4 // Unknown // Linear
+surf_mastery       // T4 // Unknown // Linear
+surf_challenge     // T4 // Unknown // Linear
 
 // Tier 5 - Expert
-"Tier 5 Maps"
-{
-    "surf_forbidden_ways"
-    "surf_nightmare"
-    "surf_expert"
-}
+surf_forbidden_ways // T5 // Unknown // Linear
+surf_nightmare     // T5 // Unknown // Linear
+surf_expert        // T5 // Unknown // Linear
+surf_impossible    // T5 // Unknown // Linear
+surf_legendary     // T5 // Unknown // Linear
+surf_master        // T5 // Unknown // Linear
 
 // Special Maps
-"Special Maps"
-{
-    "surf_christmas"
-    "surf_halloween"
-    "surf_summer_party"
-} 
+surf_christmas     // SP // Unknown // Linear
+surf_halloween     // SP // Unknown // Linear
+surf_summer_party  // SP // Unknown // Linear
+surf_winter        // SP // Unknown // Linear
+surf_party         // SP // Unknown // Linear
+
+// Bonus Maps (Multiple Paths/Stages)
+surf_multipath     // T3 // Unknown // Multi
+surf_stages        // T3 // Unknown // Staged
+surf_adventure     // T4 // Unknown // Multi
+surf_journey       // T4 // Unknown // Staged 
