@@ -11,23 +11,29 @@ echo "Internal IP: $(hostname -i | awk '{print $1}')"
 echo "Setting up Steam environment..."
 mkdir -p /home/container/Steam/logs
 
+# Create cs2.sh if it doesn't exist
+cat > /home/container/game/cs2.sh << 'EOL'
+#!/bin/bash
+cd /home/container/game
+export LD_LIBRARY_PATH="./bin:$LD_LIBRARY_PATH"
+exec ./bin/linuxsteamrt64/cs2 "$@"
+EOL
+chmod +x /home/container/game/cs2.sh
+
 # Update CS2 Server
 echo "Updating CS2 Server..."
-/home/container/steamcmd/steamcmd.sh +force_install_dir /home/container/game +login ${STEAM_ACC} +app_update ${SRCDS_APPID} ${SRCDS_VALIDATE:++validate} +quit
+/home/container/steamcmd/steamcmd.sh +force_install_dir /home/container/game +login anonymous +app_update ${SRCDS_APPID} ${SRCDS_VALIDATE:++validate} +quit
 
-# Default the Network Port to 25566
-export SRCDS_PORT=25566
-export SRCDS_MAXPLAYERS=64
-export SRCDS_STARTMAP="de_dust2"
-export SRCDS_HOSTNAME="Nans Surf CS2 Server"
-export SRCDS_TAGS="surf,tier1,timer"
+# Default variables
+SRCDS_PORT="${SERVER_PORT:-25566}"
+SRCDS_MAXPLAYERS="${SERVER_MAXPLAYERS:-64}"
+SRCDS_MAP="${SERVER_MAP:-de_dust2}"
+SERVER_NAME="${SERVER_NAME:-Nans Surf CS2 Server}"
+SURF_TIER="${SURF_TIER:-1}"
+STEAM_ACC="${STEAM_ACC:-anonymous}"
 
-# Replace Startup Variables
-MODIFIED_STARTUP=$(echo ${STARTUP} | sed -e 's/{{SERVER_PORT}}/'"${SRCDS_PORT}"'/' \
-    -e 's/{{SERVER_MAXPLAYERS}}/'"${SRCDS_MAXPLAYERS}"'/' \
-    -e 's/{{SERVER_MAP}}/'"${SRCDS_STARTMAP}"'/' \
-    -e 's/{{SERVER_HOSTNAME}}/'"${SRCDS_HOSTNAME}"'/' \
-    -e 's/{{SERVER_TAGS}}/'"${SRCDS_TAGS}"'/')
+# Build startup command
+MODIFIED_STARTUP="./game/cs2.sh -dedicated +ip 0.0.0.0 -port ${SRCDS_PORT} +hostname \"${SERVER_NAME}\" +map ${SRCDS_MAP} -maxplayers ${SRCDS_MAXPLAYERS} +sv_setsteamaccount ${STEAM_ACC} +exec server.cfg +exec surf.cfg +sv_tags \"surf,tier${SURF_TIER},timer\" +clientport 27005 +tv_port 27020 +game_type 0 +game_mode 0 +host_workshop_collection 2124557811 +metamod_load"
 
 # Start the Server
 echo "Starting server with command: ${MODIFIED_STARTUP}"

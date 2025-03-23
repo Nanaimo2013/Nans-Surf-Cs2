@@ -9,7 +9,7 @@ RUN         mkdir -p /etc/sudoers.d && \
             chmod 0440 /etc/sudoers.d/flatdeb
 
 ENV         DEBIAN_FRONTEND=noninteractive
-RUN         apt update && apt install -y iproute2 curl lib32gcc-s1 && apt-get clean
+RUN         apt update && apt install -y iproute2 curl lib32gcc-s1 lib32stdc++6 && apt-get clean
 
 # Create container user and group
 RUN         groupadd -g 1000 container && \
@@ -23,7 +23,8 @@ RUN         mkdir -p /home/container/game/csgo/cfg/sourcemod \
             /home/container/game/bin/linuxsteamrt64 \
             /home/container/steamcmd \
             /home/container/.steam/sdk32 \
-            /home/container/.steam/sdk64 && \
+            /home/container/.steam/sdk64 \
+            /home/container/Steam/logs && \
             chown -R container:container /home/container
 
 # Switch to container user
@@ -35,8 +36,8 @@ WORKDIR     /home/container
 RUN         cd /home/container/steamcmd && \
             curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - && \
             chmod +x steamcmd.sh && \
-            ln -s /home/container/steamcmd/linux32/steamclient.so /home/container/.steam/sdk32/steamclient.so && \
-            ln -s /home/container/steamcmd/linux64/steamclient.so /home/container/.steam/sdk64/steamclient.so
+            ln -sf /home/container/steamcmd/linux32/steamclient.so /home/container/.steam/sdk32/steamclient.so && \
+            ln -sf /home/container/steamcmd/linux64/steamclient.so /home/container/.steam/sdk64/steamclient.so
 
 # Copy configuration files if they exist
 COPY        --chown=container:container ./gamefiles/configs/core/ /home/container/game/csgo/cfg/
@@ -52,9 +53,11 @@ RUN         chmod +x /entrypoint.sh
 
 # Set default environment variables for Pterodactyl
 ENV         SRCDS_APPID=730 \
-            SRCDS_PORT=25566 \
-            SRCDS_MAXPLAYERS=64 \
-            SRCDS_MAP="de_dust2" \
+            SERVER_PORT=25566 \
+            SERVER_MAXPLAYERS=64 \
+            SERVER_MAP="de_dust2" \
+            SERVER_NAME="Nans Surf CS2 Server" \
+            SURF_TIER=1 \
             SRCDS_VALIDATE=1 \
             DOWNLOAD_WORKSHOP_MAPS=0 \
             STEAM_ACC="anonymous"
